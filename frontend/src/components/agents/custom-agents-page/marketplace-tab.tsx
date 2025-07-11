@@ -49,7 +49,7 @@ export const MarketplaceTab = ({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Agents</SelectItem>
-            <SelectItem value="kortix">Kortix Verified</SelectItem>
+                            <SelectItem value="kortix">Bignoodle Verified</SelectItem>
             <SelectItem value="community">Community</SelectItem>
           </SelectContent>
         </Select>
@@ -86,7 +86,7 @@ export const MarketplaceTab = ({
               {kortixTeamItems.length > 0 && (
                 <div className="space-y-6">
                   <MarketplaceSectionHeader
-                    title="Verified by Kortix"
+                    title="Verified by Bignoodle"
                     subtitle="Official agents, maintained and supported"
                   />
                   <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

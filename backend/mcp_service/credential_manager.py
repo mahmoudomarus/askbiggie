@@ -68,9 +68,17 @@ class CredentialManager:
         
         try:
             if isinstance(key_env, str):
+                # The key is already base64 encoded, just need to encode as bytes
                 return key_env.encode('utf-8')
-            else:
+            elif key_env is not None:
                 return key_env
+            else:
+                # Generate a new key as fallback
+                logger.warning("No MCP_CREDENTIAL_ENCRYPTION_KEY found, generating new key")
+                key = Fernet.generate_key()
+                logger.info(f"Generated new encryption key. Set this in your environment:")
+                logger.info(f"MCP_CREDENTIAL_ENCRYPTION_KEY={key.decode()}")
+                return key
                 
         except Exception as e:
             logger.error(f"Invalid encryption key: {e}")

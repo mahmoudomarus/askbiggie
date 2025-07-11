@@ -1,8 +1,8 @@
 [project]
-name = "suna"
+name = "biggie"
 version = "1.0"
-description = "open source generalist AI Agent"
-authors = [{ name = "marko-kraemer", email = "mail@markokraemer.com" }]
+description = "Ask Biggie - your intelligent AI assistant by Bignoodle AI"
+authors = [{ name = "Bignoodle AI Team", email = "support@bignoodle.ai" }]
 readme = "README.md"
 license = { text = "Apache-2.0" }
 classifiers = [
@@ -69,8 +69,8 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = "https://www.suna.so/"
-repository = "https://github.com/kortix-ai/suna"
+homepage = "https://askbiggie.ai/"
+repository = "https://github.com/bignoodle-ai/biggie"
 
 [tool.uv]
 package = false

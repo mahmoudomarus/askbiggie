@@ -4,6 +4,10 @@
 # working directory name when running `supabase init`.
 project_id = "agentpress"
 
+[linked]
+# Project ref of the associated Supabase project.
+project_ref = "zadvktgqpnjyhayzymqq"
+
 [api]
 enabled = true
 # Port to use for the API URL.

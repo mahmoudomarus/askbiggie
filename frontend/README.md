@@ -1,4 +1,4 @@
-# Suna Frontend
+# Ask Biggie Frontend
 
 ## Quick Setup
 

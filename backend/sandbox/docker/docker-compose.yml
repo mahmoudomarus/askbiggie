@@ -1,5 +1,5 @@
 services:
-  kortix-suna:
+  bignoodle-biggie:
     platform: linux/amd64
     build:
       context: .

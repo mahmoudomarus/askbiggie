@@ -169,7 +169,7 @@ class SandboxWebSearchTool(SandboxToolsBase):
         example='''
         <function_calls>
         <invoke name="scrape_webpage">
-        <parameter name="urls">https://www.kortix.ai/,https://github.com/kortix-ai/suna</parameter>
+        <parameter name="urls">https://www.bignoodle.ai/,https://github.com/bignoodle-ai/biggie</parameter>
         </invoke>
         </function_calls>
         '''

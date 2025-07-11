@@ -435,7 +435,7 @@ export function ToolCallSidePanel({
                   <div className="flex items-center justify-between">
                     <div className="ml-2 flex items-center gap-2">
                       <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
-                        {agentName ? `${agentName}'s Computer` : 'Suna\'s Computer'}
+                        {agentName ? `${agentName}'s Computer` : 'Biggie\'s Computer'}
                       </h2>
                     </div>
                     <Button
@@ -470,23 +470,23 @@ export function ToolCallSidePanel({
       return (
         <div className="flex flex-col h-full">
           <div className="pt-4 pl-4 pr-4">
-            <div className="flex items-center justify-between">
-              <div className="ml-2 flex items-center gap-2">
-                <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
-                  {agentName ? `${agentName}'s Computer` : 'Suna\'s Computer'}
-                </h2>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleClose}
-                className="h-8 w-8"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+                      <div className="flex items-center justify-between">
+            <div className="ml-2 flex items-center gap-2">
+              <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
+                {agentName ? `${agentName}'s Computer` : 'Biggie\'s Computer'}
+              </h2>
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="h-8 w-8"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-          <div className="flex flex-col items-center justify-center flex-1 p-8">
+        </div>
+        <div className="flex flex-col items-center justify-center flex-1 p-8">
             <div className="flex flex-col items-center space-y-4 max-w-sm text-center">
               <div className="relative">
                 <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center">
@@ -519,7 +519,7 @@ export function ToolCallSidePanel({
               <div className="flex items-center justify-between">
                 <div className="ml-2 flex items-center gap-2">
                   <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
-                    {agentName ? `${agentName}'s Computer` : 'Suna\'s Computer'}
+                    {agentName ? `${agentName}'s Computer` : 'Biggie\'s Computer'}
                   </h2>
                 </div>
                 <div className="flex items-center gap-2">
@@ -565,7 +565,7 @@ export function ToolCallSidePanel({
             <div className="flex items-center justify-between">
               <div className="ml-2 flex items-center gap-2">
                 <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
-                  {agentName ? `${agentName}'s Computer` : 'Suna\'s Computer'}
+                  {agentName ? `${agentName}'s Computer` : 'Biggie\'s Computer'}
                 </h2>
               </div>
               <Button
@@ -615,7 +615,7 @@ export function ToolCallSidePanel({
           <div className="flex items-center justify-between">
             <motion.div layoutId="tool-icon" className="ml-2 flex items-center gap-2">
               <h2 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
-                {agentName ? `${agentName}'s Computer` : 'Suna\'s Computer'}
+                {agentName ? `${agentName}'s Computer` : 'Biggie\'s Computer'}
               </h2>
             </motion.div>
 

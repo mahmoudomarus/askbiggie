@@ -105,7 +105,7 @@ export const AgentConfigModal: React.FC<AgentConfigModalProps> = ({
     }
   };
 
-  const displayName = agent?.name || 'Suna';
+  const displayName = agent?.name || 'Biggie';
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

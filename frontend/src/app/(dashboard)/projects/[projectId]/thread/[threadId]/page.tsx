@@ -475,7 +475,7 @@ export default function ThreadPage({
   // SEO title update
   useEffect(() => {
     if (projectName) {
-      document.title = `${projectName} | Kortix Suna`;
+              document.title = `${projectName} | Bignoodle AI`;
 
       const metaDescription = document.querySelector(
         'meta[name="description"]',
@@ -483,13 +483,13 @@ export default function ThreadPage({
       if (metaDescription) {
         metaDescription.setAttribute(
           'content',
-          `${projectName} - Interactive agent conversation powered by Kortix Suna`,
+          `${projectName} - Interactive agent conversation powered by Bignoodle AI`,
         );
       }
 
       const ogTitle = document.querySelector('meta[property="og:title"]');
       if (ogTitle) {
-        ogTitle.setAttribute('content', `${projectName} | Kortix Suna`);
+        ogTitle.setAttribute('content', `${projectName} | Bignoodle AI`);
       }
 
       const ogDescription = document.querySelector(
@@ -511,7 +511,7 @@ export default function ThreadPage({
 
   useEffect(() => {
     if (initialLoadCompleted && subscriptionData) {
-      const hasSeenUpgradeDialog = localStorage.getItem('suna_upgrade_dialog_displayed');
+      const hasSeenUpgradeDialog = localStorage.getItem('biggie_upgrade_dialog_displayed');
       const isFreeTier = subscriptionStatus === 'no_subscription';
       if (!hasSeenUpgradeDialog && isFreeTier && !isLocalMode()) {
         setShowUpgradeDialog(true);
@@ -521,7 +521,7 @@ export default function ThreadPage({
 
   const handleDismissUpgradeDialog = () => {
     setShowUpgradeDialog(false);
-    localStorage.setItem('suna_upgrade_dialog_displayed', 'true');
+          localStorage.setItem('biggie_upgrade_dialog_displayed', 'true');
   };
 
   useEffect(() => {

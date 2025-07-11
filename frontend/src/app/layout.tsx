@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     template: `%s - ${siteConfig.name}`,
   },
   description:
-    'Suna is a fully open source AI assistant that helps you accomplish real-world tasks with ease. Through natural conversation, Suna becomes your digital companion for research, data analysis, and everyday challenges.',
+    'Ask Biggie - your intelligent AI assistant by Bignoodle AI that helps you accomplish real-world tasks with ease. Through natural conversation, Biggie becomes your digital companion for research, data analysis, and everyday challenges.',
   keywords: [
     'AI',
     'artificial intelligence',
@@ -43,13 +43,13 @@ export const metadata: Metadata = {
     'research',
     'data analysis',
   ],
-  authors: [{ name: 'Kortix Team', url: 'https://suna.so' }],
+  authors: [{ name: 'Bignoodle AI Team', url: 'https://askbiggie.ai' }],
   creator:
-    'Kortix Team - Adam Cohen Hillel, Marko Kraemer, Domenico Gagliardi, and Quoc Dat Le',
+    'Bignoodle AI Team',
   publisher:
-    'Kortix Team - Adam Cohen Hillel, Marko Kraemer, Domenico Gagliardi, and Quoc Dat Le',
+    'Bignoodle AI Team',
   category: 'Technology',
-  applicationName: 'Suna',
+  applicationName: 'Biggie',
   formatDetection: {
     telephone: false,
     email: false,
@@ -64,17 +64,17 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: 'Suna - Open Source Generalist AI Agent',
+    title: 'Biggie - Ask Biggie AI Assistant',
     description:
-      'Suna is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.',
+      'Ask Biggie - your intelligent AI assistant by Bignoodle AI that helps you accomplish real-world tasks with ease through natural conversation.',
     url: siteConfig.url,
-    siteName: 'Suna',
+    siteName: 'Bignoodle AI',
     images: [
       {
         url: '/banner.png',
         width: 1200,
         height: 630,
-        alt: 'Suna - Open Source Generalist AI Agent',
+        alt: 'Biggie - Open Source Generalist AI Agent',
         type: 'image/png',
       },
     ],
@@ -83,23 +83,23 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Suna - Open Source Generalist AI Agent',
+    title: 'Biggie - Ask Biggie AI Assistant',
     description:
-      'Suna is a fully open source AI assistant that helps you accomplish real-world tasks with ease through natural conversation.',
-    creator: '@kortixai',
-    site: '@kortixai',
+      'Ask Biggie - your intelligent AI assistant by Bignoodle AI that helps you accomplish real-world tasks with ease through natural conversation.',
+    creator: '@bignoodleai',
+    site: '@bignoodleai',
     images: [
       {
         url: '/banner.png',
         width: 1200,
         height: 630,
-        alt: 'Suna - Open Source Generalist AI Agent',
+        alt: 'Biggie - Open Source Generalist AI Agent',
       },
     ],
   },
   icons: {
-    icon: [{ url: '/favicon.png', sizes: 'any' }],
-    shortcut: '/favicon.png',
+    icon: [{ url: '/favicon.ico', sizes: 'any' }],
+    shortcut: '/favicon.ico',
   },
   // manifest: "/manifest.json",
   alternates: {

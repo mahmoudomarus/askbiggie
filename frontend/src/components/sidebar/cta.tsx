@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Briefcase, ExternalLink } from 'lucide-react';
-import { KortixProcessModal } from '@/components/sidebar/kortix-enterprise-modal';
+import { BiggieEnterpriseModal } from '@/components/sidebar/kortix-enterprise-modal';
 
 export function CTACard() {
   return (
@@ -17,7 +17,7 @@ export function CTACard() {
         </div>
 
         <div>
-          <KortixProcessModal />
+                      <BiggieEnterpriseModal />
         </div>
 
         <div className="flex items-center pt-1 border-t border-blue-200/50 dark:border-blue-800/30 mt-1">
