@@ -202,3 +202,8 @@ backend/.test_token_compression.py
 backend/test_token_compression_data.py
 
 dump.rdb
+# Environment files with sensitive data
+backend/.env.backup
+backend/.env.bak
+*.env.backup
+*.env.bak
