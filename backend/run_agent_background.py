@@ -22,10 +22,22 @@ from utils.retry import retry
 
 import sentry_sdk
 from typing import Dict, Any
+from urllib.parse import urlparse
 
-rabbitmq_host = os.getenv('RABBITMQ_HOST', 'rabbitmq')
-rabbitmq_port = int(os.getenv('RABBITMQ_PORT', 5672))
-rabbitmq_broker = RabbitmqBroker(host=rabbitmq_host, port=rabbitmq_port, middleware=[dramatiq.middleware.AsyncIO()])
+# Configure RabbitMQ broker - check for CloudAMQP URL first, then fallback to individual variables
+cloudamqp_url = os.getenv('CLOUDAMQP_URL')
+if cloudamqp_url:
+    # Parse CloudAMQP URL (format: amqps://username:password@hostname/vhost)
+    parsed = urlparse(cloudamqp_url)
+    rabbitmq_broker = RabbitmqBroker(url=cloudamqp_url, middleware=[dramatiq.middleware.AsyncIO()])
+    logger.info(f"Using CloudAMQP broker: {parsed.hostname}")
+else:
+    # Fallback to individual host/port configuration
+    rabbitmq_host = os.getenv('RABBITMQ_HOST', 'rabbitmq')
+    rabbitmq_port = int(os.getenv('RABBITMQ_PORT', 5672))
+    rabbitmq_broker = RabbitmqBroker(host=rabbitmq_host, port=rabbitmq_port, middleware=[dramatiq.middleware.AsyncIO()])
+    logger.info(f"Using RabbitMQ broker: {rabbitmq_host}:{rabbitmq_port}")
+
 dramatiq.set_broker(rabbitmq_broker)
 
 
