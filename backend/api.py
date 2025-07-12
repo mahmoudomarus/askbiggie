@@ -132,7 +132,11 @@ async def log_requests_middleware(request: Request, call_next):
         raise
 
 # Define allowed origins based on environment
-allowed_origins = ["https://askbiggie.ai", "https://www.askbiggie.ai"]
+allowed_origins = [
+    "https://askbiggie.ai", 
+    "https://www.askbiggie.ai",
+    "https://askbiggie.vercel.app"  # Add production Vercel domain
+]
 allow_origin_regex = None
 
 # Add local development origins
@@ -143,7 +147,7 @@ if config.ENV_MODE == EnvMode.LOCAL:
 if config.ENV_MODE == EnvMode.STAGING:
     allowed_origins.append("https://staging.askbiggie.ai")
     allowed_origins.append("http://localhost:3000")
-    allow_origin_regex = r"https://biggie-.*-prjcts\.vercel\.app"
+    allow_origin_regex = r"https://.*\.vercel\.app"  # Allow all Vercel deployments
 
 app.add_middleware(
     CORSMiddleware,
