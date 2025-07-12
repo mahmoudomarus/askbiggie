@@ -46,7 +46,10 @@ class FeatureFlagManager:
             return enabled == 'true' if enabled else False
         except Exception as e:
             logger.error(f"Failed to check feature flag {key}: {e}")
-            # Return False by default if Redis is unavailable
+            # Return True for custom_agents when Redis is unavailable to ensure basic functionality works
+            if key == 'custom_agents':
+                return True
+            # Return False by default for other flags if Redis is unavailable
             return False
     
     async def get_flag(self, key: str) -> Optional[Dict[str, str]]:
