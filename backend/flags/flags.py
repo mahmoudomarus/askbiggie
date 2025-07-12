@@ -40,25 +40,18 @@ class FeatureFlagManager:
     async def is_enabled(self, key: str) -> bool:
         """Check if a feature flag is enabled"""
         # Check for environment variable override first
-        force_enable_value = os.getenv('FORCE_ENABLE_CUSTOM_AGENTS', '')
-        logger.info(f"Feature flag check for '{key}': FORCE_ENABLE_CUSTOM_AGENTS='{force_enable_value}'")
-        
-        if key == 'custom_agents' and force_enable_value.lower() == 'true':
-            logger.info(f"Feature flag '{key}' enabled via environment variable override")
+        if key == 'custom_agents' and os.getenv('FORCE_ENABLE_CUSTOM_AGENTS', '').lower() == 'true':
             return True
             
         try:
             flag_key = f"{self.flag_prefix}{key}"
             redis_client = await redis.get_client()
             enabled = await redis_client.hget(flag_key, 'enabled')
-            redis_result = enabled == 'true' if enabled else False
-            logger.info(f"Feature flag '{key}' Redis result: enabled='{enabled}', result={redis_result}")
-            return redis_result
+            return enabled == 'true' if enabled else False
         except Exception as e:
             logger.error(f"Failed to check feature flag {key}: {e}")
             # Return True for custom_agents when Redis is unavailable to ensure basic functionality works
             if key == 'custom_agents':
-                logger.info(f"Feature flag '{key}' Redis unavailable, defaulting to True")
                 return True
             # Return False by default for other flags if Redis is unavailable
             return False
