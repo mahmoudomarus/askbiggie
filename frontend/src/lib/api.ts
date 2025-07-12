@@ -1707,8 +1707,7 @@ export const createCheckoutSession = async (
     }
     
     
-    const requestBody = { ...request, tolt_referral: window.tolt_referral };
-    console.log('Tolt Referral ID:', requestBody.tolt_referral);
+    const requestBody = { ...request };
     
     const response = await fetch(`${API_URL}/billing/create-checkout-session`, {
       method: 'POST',

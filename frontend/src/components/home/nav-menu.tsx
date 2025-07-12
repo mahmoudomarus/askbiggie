@@ -20,19 +20,24 @@ export function NavMenu() {
   const [isManualScroll, setIsManualScroll] = useState(false);
 
   React.useEffect(() => {
-    // Initialize with first nav item
-    const firstItem = ref.current?.querySelector(
-      `[href="#${navs[0].href.substring(1)}"]`,
-    )?.parentElement;
-    if (firstItem) {
-      const rect = firstItem.getBoundingClientRect();
-      setLeft(firstItem.offsetLeft);
-      setWidth(rect.width);
-      setIsReady(true);
+    // Initialize with first nav item only if navs array has items
+    if (navs.length > 0) {
+      const firstItem = ref.current?.querySelector(
+        `[href="#${navs[0].href.substring(1)}"]`,
+      )?.parentElement;
+      if (firstItem) {
+        const rect = firstItem.getBoundingClientRect();
+        setLeft(firstItem.offsetLeft);
+        setWidth(rect.width);
+        setIsReady(true);
+      }
     }
   }, []);
 
   React.useEffect(() => {
+    // Skip if no navigation items
+    if (navs.length === 0) return;
+
     const handleScroll = () => {
       // Skip scroll handling during manual click scrolling
       if (isManualScroll) return;
@@ -110,6 +115,11 @@ export function NavMenu() {
       }, 500); // Adjust timing to match scroll animation duration
     }
   };
+
+  // Don't render anything if no navigation items
+  if (navs.length === 0) {
+    return null;
+  }
 
   return (
     <div className="w-full hidden md:block">

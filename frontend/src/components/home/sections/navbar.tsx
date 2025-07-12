@@ -2,7 +2,6 @@
 
 import { Icons } from '@/components/home/icons';
 import { NavMenu } from '@/components/home/nav-menu';
-import { ThemeToggle } from '@/components/home/theme-toggle';
 import { siteConfig } from '@/lib/home';
 import { cn } from '@/lib/utils';
 import { Menu, X, Github } from 'lucide-react';
@@ -10,7 +9,6 @@ import { AnimatePresence, motion, useScroll } from 'motion/react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { useTheme } from 'next-themes';
 import { useAuth } from '@/components/AuthProvider';
 
 const INITIAL_WIDTH = '70rem';
@@ -57,15 +55,12 @@ export function Navbar() {
   const [hasScrolled, setHasScrolled] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('hero');
-  const { theme, resolvedTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    // Skip if no navigation items
+    if (siteConfig.nav.links.length === 0) return;
 
-  useEffect(() => {
     const handleScroll = () => {
       const sections = siteConfig.nav.links.map((item) =>
         item.href.substring(1),
@@ -99,12 +94,6 @@ export function Navbar() {
   const toggleDrawer = () => setIsDrawerOpen((prev) => !prev);
   const handleOverlayClick = () => setIsDrawerOpen(false);
 
-  const logoSrc = !mounted
-    ? '/logo.png'
-    : resolvedTheme === 'dark'
-      ? '/logo.png'
-      : '/logo.png';
-
   return (
     <header
       className={cn(
@@ -128,10 +117,10 @@ export function Navbar() {
           <div className="flex h-[56px] items-center justify-between p-4">
             <Link href="/" className="flex items-center gap-3">
               <Image
-                src={logoSrc}
+                src="/logo.png"
                 alt="Bignoodle AI Logo"
-                width={140}
-                height={22}
+                width={80}
+                height={16}
                 priority
               /> 
             </Link>
@@ -140,63 +129,46 @@ export function Navbar() {
 
             <div className="flex flex-row items-center gap-1 md:gap-3 shrink-0">
               <div className="flex items-center space-x-3">
-                {/* <Link
-                  href="https://github.com/bignoodle-ai/biggie"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hidden md:flex items-center justify-center h-8 px-3 text-sm font-normal tracking-wide rounded-full text-primary hover:text-primary/80 transition-colors"
-                  aria-label="GitHub"
-                >
-                  <Github className="size-[18px]" />
-                </Link> */}
                 {user ? (
                   <Link
-                    className="bg-secondary h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-fit px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12]"
+                    className="bg-secondary h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-secondary-foreground w-fit px-4 shadow-sm border border-border"
                     href="/dashboard"
                   >
                     Dashboard
                   </Link>
                 ) : (
                   <Link
-                    className="bg-secondary h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-fit px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12]"
+                    className="bg-secondary h-8 hidden md:flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-secondary-foreground w-fit px-4 shadow-sm border border-border"
                     href="/auth"
                   >
                     Get started
                   </Link>
                 )}
               </div>
-              <ThemeToggle />
-              <button
-                className="md:hidden border border-border size-8 rounded-md cursor-pointer flex items-center justify-center"
+
+              <Menu
+                className="size-6 cursor-pointer md:hidden"
                 onClick={toggleDrawer}
-              >
-                {isDrawerOpen ? (
-                  <X className="size-5" />
-                ) : (
-                  <Menu className="size-5" />
-                )}
-              </button>
+              />
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Mobile Drawer */}
       <AnimatePresence>
         {isDrawerOpen && (
           <>
             <motion.div
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 bg-background/40 backdrop-blur-md z-40"
               initial="hidden"
               animate="visible"
               exit="exit"
               variants={overlayVariants}
-              transition={{ duration: 0.2 }}
               onClick={handleOverlayClick}
             />
 
             <motion.div
-              className="fixed inset-x-0 w-[95%] mx-auto bottom-3 bg-background border border-border p-4 rounded-xl shadow-lg"
+              className="fixed inset-x-0 w-[95%] mx-auto bottom-3 bg-background border border-border p-4 rounded-xl shadow-lg z-50"
               initial="hidden"
               animate="visible"
               exit="exit"
@@ -207,10 +179,10 @@ export function Navbar() {
                 <div className="flex items-center justify-between">
                   <Link href="/" className="flex items-center gap-3">
                     <Image
-                      src={logoSrc}
+                      src="/logo.png"
                       alt="Bignoodle AI Logo"
-                      width={120}
-                      height={22}
+                      width={70}
+                      height={14}
                       priority
                     />
                     <span className="font-medium text-primary text-sm">
@@ -230,7 +202,7 @@ export function Navbar() {
                   variants={drawerMenuContainerVariants}
                 >
                   <AnimatePresence>
-                    {siteConfig.nav.links.map((item) => (
+                    {siteConfig.nav.links.length > 0 && siteConfig.nav.links.map((item) => (
                       <motion.li
                         key={item.id}
                         className="p-2.5 border-b border-border last:border-b-0"
@@ -243,14 +215,14 @@ export function Navbar() {
                             const element = document.getElementById(
                               item.href.substring(1),
                             );
-                            element?.scrollIntoView({ behavior: 'smooth' });
-                            setIsDrawerOpen(false);
+                            if (element) {
+                              element.scrollIntoView({
+                                behavior: 'smooth',
+                              });
+                              setIsDrawerOpen(false);
+                            }
                           }}
-                          className={`underline-offset-4 hover:text-primary/80 transition-colors ${
-                            activeSection === item.href.substring(1)
-                              ? 'text-primary font-medium'
-                              : 'text-primary/60'
-                          }`}
+                          className="font-normal text-muted-foreground hover:text-foreground transition-colors"
                         >
                           {item.name}
                         </a>
@@ -259,26 +231,22 @@ export function Navbar() {
                   </AnimatePresence>
                 </motion.ul>
 
-                {/* Action buttons */}
                 <div className="flex flex-col gap-2">
                   {user ? (
                     <Link
+                      className="bg-secondary flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-secondary-foreground h-10 w-full px-4 shadow-sm border border-border"
                       href="/dashboard"
-                      className="bg-secondary h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-full px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12] hover:bg-secondary/80 transition-all ease-out active:scale-95"
                     >
                       Dashboard
                     </Link>
                   ) : (
                     <Link
+                      className="bg-secondary flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-secondary-foreground h-10 w-full px-4 shadow-sm border border-border"
                       href="/auth"
-                      className="bg-secondary h-8 flex items-center justify-center text-sm font-normal tracking-wide rounded-full text-primary-foreground dark:text-secondary-foreground w-full px-4 shadow-[inset_0_1px_2px_rgba(255,255,255,0.25),0_3px_3px_-1.5px_rgba(16,24,40,0.06),0_1px_1px_rgba(16,24,40,0.08)] border border-white/[0.12] hover:bg-secondary/80 transition-all ease-out active:scale-95"
                     >
-                      Get Started
+                      Get started
                     </Link>
                   )}
-                  <div className="flex justify-between">
-                    <ThemeToggle />
-                  </div>
                 </div>
               </div>
             </motion.div>
@@ -286,5 +254,5 @@ export function Navbar() {
         )}
       </AnimatePresence>
     </header>
-  ); 
+  );
 }
