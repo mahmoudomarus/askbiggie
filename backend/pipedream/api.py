@@ -404,6 +404,25 @@ async def get_pipedream_apps(
             "total_count": page_info.get("total_count", 0)
         }
         
+    except ValueError as e:
+        # Handle missing Pipedream credentials gracefully
+        if "Missing required environment variables" in str(e):
+            logger.info("Pipedream credentials not configured, returning empty apps list")
+            return {
+                "success": True,
+                "apps": [],
+                "page_info": {
+                    "total_count": 0,
+                    "count": 0,
+                    "has_more": False,
+                    "end_cursor": None
+                },
+                "total_count": 0,
+                "message": "Pipedream integration not configured"
+            }
+        # Re-raise other ValueErrors
+        raise HTTPException(status_code=400, detail=str(e))
+        
     except Exception as e:
         logger.error(f"Failed to fetch Pipedream apps: {str(e)}")
         raise HTTPException(
@@ -446,6 +465,14 @@ async def get_credential_profiles(
         
         logger.info(f"Successfully retrieved {len(profiles)} credential profiles")
         return profiles
+        
+    except ValueError as e:
+        # Handle missing Pipedream credentials gracefully
+        if "Missing required environment variables" in str(e):
+            logger.info("Pipedream credentials not configured, returning empty profiles list")
+            return []
+        # Re-raise other ValueErrors
+        raise HTTPException(status_code=400, detail=str(e))
         
     except Exception as e:
         logger.error(f"Failed to get credential profiles: {str(e)}")
