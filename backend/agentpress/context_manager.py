@@ -187,26 +187,34 @@ class ContextManager:
         return result
 
     def compress_messages(self, messages: List[Dict[str, Any]], llm_model: str, max_tokens: Optional[int] = 41000, token_threshold: int = 4096, max_iterations: int = 5) -> List[Dict[str, Any]]:
-        """Compress the messages.
+        """Compress the messages to fit within the token limit.
         
         Args:
             messages: List of messages to compress
             llm_model: Model name for token counting
-            max_tokens: Maximum allowed tokens
-            token_threshold: Token threshold for individual message compression (must be a power of 2)
-            max_iterations: Maximum number of compression iterations
+            max_tokens: Maximum allowed tokens (default 41000)
+            token_threshold: Threshold for compression (default 4096)
+            max_iterations: Maximum compression iterations (default 5)
         """
-        # Set model-specific token limits
+        if max_tokens is None:
+            max_tokens = 41000
+
+        # More aggressive token limits to avoid rate limiting
         if 'sonnet' in llm_model.lower():
-            max_tokens = 200 * 1000 - 64000 - 28000
+            # Reduce from 108k to 30k to avoid rate limits (40k/min)
+            max_tokens = min(max_tokens, 30000)
         elif 'gpt' in llm_model.lower():
-            max_tokens = 128 * 1000 - 28000
+            max_tokens = min(max_tokens, 25000)
         elif 'gemini' in llm_model.lower():
-            max_tokens = 1000 * 1000 - 300000
+            max_tokens = min(max_tokens, 35000)
         elif 'deepseek' in llm_model.lower():
-            max_tokens = 128 * 1000 - 28000
+            max_tokens = min(max_tokens, 25000)
         else:
-            max_tokens = 41 * 1000 - 10000
+            max_tokens = min(max_tokens, 20000)
+
+        # More aggressive compression threshold
+        if token_threshold > 2048:
+            token_threshold = 2048
 
         result = messages
         result = self.remove_meta_messages(result)

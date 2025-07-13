@@ -89,6 +89,29 @@ def get_direct_provider_fallback(model_name: str) -> Optional[str]:
     
     return direct_fallback_mapping.get(model_name)
 
+def should_prefer_openrouter(model_name: str, token_count: int = 0) -> bool:
+    """Determine if we should prefer OpenRouter based on model and token count."""
+    # For high token requests, prefer OpenRouter to avoid rate limits
+    if token_count > 25000:
+        return True
+    
+    # For Anthropic models, prefer OpenRouter if recent rate limiting
+    if model_name.startswith("anthropic/"):
+        return True
+        
+    return False
+
+def get_optimized_model_routing(model_name: str, token_count: int = 0) -> str:
+    """Get optimized model routing based on token count and rate limits."""
+    # For high-token requests or Anthropic models, route through OpenRouter first
+    if should_prefer_openrouter(model_name, token_count):
+        openrouter_fallback = get_openrouter_fallback(model_name)
+        if openrouter_fallback:
+            logger.info(f"Routing {model_name} through OpenRouter ({openrouter_fallback}) for {token_count} tokens")
+            return openrouter_fallback
+    
+    return model_name
+
 def get_openrouter_fallback(model_name: str) -> Optional[str]:
     """Get OpenRouter fallback model for a given model name."""
     # Skip if already using OpenRouter
@@ -314,6 +337,22 @@ async def make_llm_api_call(
         LLMRetryError: If API call fails after retries
         LLMError: For other API-related errors
     """
+    # Calculate token count for optimized routing
+    try:
+        from litellm.utils import token_counter
+        estimated_tokens = token_counter(model=model_name, messages=messages)
+        logger.debug(f"Estimated tokens for {model_name}: {estimated_tokens}")
+    except Exception as e:
+        logger.warning(f"Could not estimate tokens: {e}")
+        estimated_tokens = 0
+    
+    # Apply optimized routing based on token count and rate limits
+    original_model = model_name
+    model_name = get_optimized_model_routing(model_name, estimated_tokens)
+    
+    if model_name != original_model:
+        logger.info(f"🔄 Model routing: {original_model} → {model_name} (tokens: {estimated_tokens})")
+    
     # debug <timestamp>.json messages
     logger.info(f"Making LLM API call to model: {model_name} (Thinking: {enable_thinking}, Effort: {reasoning_effort})")
     logger.info(f"📡 API Call: Using model {model_name}")
@@ -366,8 +405,22 @@ async def make_llm_api_call(
                 await handle_error(e, attempt, MAX_RETRIES)
 
         except (litellm.exceptions.RateLimitError, OpenAIError, json.JSONDecodeError) as e:
-            # Check if this is an OpenRouter credit exhaustion error
             error_msg = str(e).lower()
+            
+            # Handle Anthropic rate limit errors specifically
+            if ("rate_limit_error" in error_msg or "rate limit" in error_msg) and "anthropic" in error_msg:
+                # Try OpenRouter fallback for Anthropic rate limits
+                openrouter_fallback = get_openrouter_fallback(original_model)
+                if openrouter_fallback and not params.get("model", "").startswith("openrouter/"):
+                    logger.warning(f"🚫 Anthropic rate limit hit, routing to OpenRouter: {openrouter_fallback}")
+                    params["model"] = openrouter_fallback
+                    # Remove any model_id as it's specific to Bedrock
+                    params.pop("model_id", None)
+                    last_error = e
+                    await handle_error(e, attempt, MAX_RETRIES)
+                    continue
+            
+            # Check if this is an OpenRouter credit exhaustion error
             if ("openrouter" in params.get("model", "").lower() and 
                 ("credit" in error_msg or "insufficient" in error_msg or "afford" in error_msg)):
                 # Try direct provider fallback for OpenRouter credit issues
