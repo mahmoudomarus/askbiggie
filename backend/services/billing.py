@@ -29,7 +29,8 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 # Unlimited users whitelist - these users bypass all billing restrictions
 UNLIMITED_USERS = {
     "mahmoudomarus@gmail.com",
-    "alpay@bignoodle.com"
+    "alpay@bignoodle.com",
+    "alicezheng114@gmail.com"
 }
 
 def get_unlimited_users():
