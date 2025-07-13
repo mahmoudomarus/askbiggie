@@ -26,6 +26,22 @@ TOKEN_PRICE_MULTIPLIER = 1.5
 # Initialize router
 router = APIRouter(prefix="/billing", tags=["billing"])
 
+# Unlimited tier users - add your user IDs here
+UNLIMITED_TIER_USERS = {
+    # Add user IDs that should have unlimited access
+    # Example: "user-uuid-here": "Unlimited Admin",
+}
+
+# Load unlimited users from environment variable if available
+import json
+import os
+try:
+    unlimited_users_str = os.getenv('UNLIMITED_TIER_USERS', '{}')
+    UNLIMITED_TIER_USERS.update(json.loads(unlimited_users_str))
+    logger.info(f"Loaded {len(UNLIMITED_TIER_USERS)} unlimited tier users from environment")
+except Exception as e:
+    logger.warning(f"Error loading unlimited tier users from environment: {e}")
+
 def get_model_pricing(model: str) -> tuple[float, float] | None:
     """
     Get pricing for a model. Returns (input_cost_per_million, output_cost_per_million) or None.
@@ -440,6 +456,15 @@ async def get_allowed_models_for_user(client, user_id: str):
 
 
 async def can_use_model(client, user_id: str, model_name: str):
+    # Check for unlimited tier users first
+    if user_id in UNLIMITED_TIER_USERS:
+        logger.info(f"Unlimited tier user {user_id} ({UNLIMITED_TIER_USERS[user_id]}) - model access granted")
+        return True, f"Unlimited tier access - {UNLIMITED_TIER_USERS[user_id]}", {
+            "price_id": "unlimited",
+            "plan_name": "Unlimited Tier",
+            "minutes_limit": "unlimited"
+        }
+    
     if config.ENV_MODE == EnvMode.LOCAL:
         logger.info("Running in local development mode - billing checks are disabled")
         return True, "Local development mode - billing disabled", {
@@ -462,6 +487,16 @@ async def check_billing_status(client, user_id: str) -> Tuple[bool, str, Optiona
     Returns:
         Tuple[bool, str, Optional[Dict]]: (can_run, message, subscription_info)
     """
+    # Check for unlimited tier users first
+    if user_id in UNLIMITED_TIER_USERS:
+        logger.info(f"Unlimited tier user {user_id} ({UNLIMITED_TIER_USERS[user_id]}) - billing checks bypassed")
+        return True, f"Unlimited tier access - {UNLIMITED_TIER_USERS[user_id]}", {
+            "price_id": "unlimited",
+            "plan_name": "Unlimited Tier",
+            "minutes_limit": "unlimited",
+            "cost_limit": "unlimited"
+        }
+    
     if config.ENV_MODE == EnvMode.LOCAL:
         logger.info("Running in local development mode - billing checks are disabled")
         return True, "Local development mode - billing disabled", {
@@ -1293,3 +1328,36 @@ async def get_usage_logs_endpoint(
     except Exception as e:
         logger.error(f"Error getting usage logs: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting usage logs: {str(e)}")
+
+@router.get("/debug/user-info")
+async def get_user_info(
+    current_user_id: str = Depends(get_current_user_id_from_jwt)
+):
+    """Debug endpoint to get current user ID and subscription info."""
+    try:
+        # Get Supabase client
+        db = DBConnection()
+        client = await db.client
+        
+        # Get user email from auth.users
+        user_result = await client.auth.admin.get_user_by_id(current_user_id)
+        email = user_result.user.email if user_result else "Unknown"
+        
+        # Get subscription info
+        subscription = await get_user_subscription(current_user_id)
+        
+        # Check if user is in unlimited tier
+        is_unlimited = current_user_id in UNLIMITED_TIER_USERS
+        
+        return {
+            "user_id": current_user_id,
+            "email": email,
+            "is_unlimited": is_unlimited,
+            "unlimited_label": UNLIMITED_TIER_USERS.get(current_user_id, None),
+            "subscription": subscription,
+            "total_unlimited_users": len(UNLIMITED_TIER_USERS)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting user info: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
