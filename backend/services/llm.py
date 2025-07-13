@@ -65,6 +65,30 @@ def setup_api_keys() -> None:
     else:
         logger.warning(f"Missing AWS credentials for Bedrock integration - access_key: {bool(aws_access_key)}, secret_key: {bool(aws_secret_key)}, region: {aws_region}")
 
+def get_direct_provider_fallback(model_name: str) -> Optional[str]:
+    """Get direct provider fallback when OpenRouter fails."""
+    # Map OpenRouter models to direct providers when available
+    direct_fallback_mapping = {
+        # OpenRouter Claude models → Direct Anthropic
+        "openrouter/anthropic/claude-sonnet-4": "anthropic/claude-sonnet-4-20250514",
+        "openrouter/anthropic/claude-3.7-sonnet": "anthropic/claude-3-7-sonnet-latest",
+        
+        # OpenRouter Deepseek → Direct Claude (no direct Deepseek API)
+        "openrouter/deepseek/deepseek-chat": "anthropic/claude-sonnet-4-20250514",
+        
+        # OpenRouter Qwen → Direct Claude (no direct Qwen API)  
+        "openrouter/qwen/qwen3-235b-a22b": "anthropic/claude-sonnet-4-20250514",
+        
+        # OpenRouter Gemini → Direct Claude (Google AI API requires setup)
+        "openrouter/google/gemini-2.5-flash-preview-05-20": "anthropic/claude-sonnet-4-20250514",
+        
+        # OpenRouter GPT → Direct OpenAI
+        "openrouter/openai/gpt-4o": "openai/gpt-4o",
+        "openrouter/openai/gpt-4o-mini": "openai/gpt-4o-mini",
+    }
+    
+    return direct_fallback_mapping.get(model_name)
+
 def get_openrouter_fallback(model_name: str) -> Optional[str]:
     """Get OpenRouter fallback model for a given model name."""
     # Skip if already using OpenRouter
@@ -342,10 +366,49 @@ async def make_llm_api_call(
                 await handle_error(e, attempt, MAX_RETRIES)
 
         except (litellm.exceptions.RateLimitError, OpenAIError, json.JSONDecodeError) as e:
+            # Check if this is an OpenRouter credit exhaustion error
+            error_msg = str(e).lower()
+            if ("openrouter" in params.get("model", "").lower() and 
+                ("credit" in error_msg or "insufficient" in error_msg or "afford" in error_msg)):
+                # Try direct provider fallback for OpenRouter credit issues
+                direct_fallback = get_direct_provider_fallback(params.get("model", ""))
+                if direct_fallback and attempt < MAX_RETRIES - 1:  # Save last attempt for original error
+                    logger.warning(f"OpenRouter credits insufficient, falling back to direct provider: {direct_fallback}")
+                    params["model"] = direct_fallback
+                    # Remove any OpenRouter-specific headers
+                    if "extra_headers" in params:
+                        headers = params["extra_headers"]
+                        headers.pop("HTTP-Referer", None)
+                        headers.pop("X-Title", None)
+                        if not headers:
+                            params.pop("extra_headers", None)
+                    last_error = e
+                    await handle_error(e, attempt, MAX_RETRIES)
+                    continue
+            
             last_error = e
             await handle_error(e, attempt, MAX_RETRIES)
 
         except Exception as e:
+            # Check if this is an OpenRouter-related error that we can fall back from
+            error_msg = str(e).lower()
+            if ("openrouter" in params.get("model", "").lower() and 
+                ("error" in error_msg or "failed" in error_msg)):
+                direct_fallback = get_direct_provider_fallback(params.get("model", ""))
+                if direct_fallback and attempt < MAX_RETRIES - 1:
+                    logger.warning(f"OpenRouter error, falling back to direct provider: {direct_fallback}")
+                    params["model"] = direct_fallback
+                    # Remove any OpenRouter-specific headers
+                    if "extra_headers" in params:
+                        headers = params["extra_headers"]
+                        headers.pop("HTTP-Referer", None)
+                        headers.pop("X-Title", None)
+                        if not headers:
+                            params.pop("extra_headers", None)
+                    last_error = e
+                    await handle_error(e, attempt, MAX_RETRIES)
+                    continue
+            
             logger.error(f"Unexpected error during API call: {str(e)}", exc_info=True)
             raise LLMError(f"API call failed: {str(e)}")
 
