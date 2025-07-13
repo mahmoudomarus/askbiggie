@@ -15,8 +15,6 @@ import {
   Settings,
   User,
   AudioWaveform,
-  Sun,
-  Moon,
 } from 'lucide-react';
 import { useAccounts } from '@/hooks/use-accounts';
 import NewTeamForm from '@/components/basejump/new-team-form';
@@ -47,7 +45,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { createClient } from '@/lib/supabase/client';
-import { useTheme } from 'next-themes';
 
 export function NavUserWithTeams({
   user,
@@ -62,7 +59,6 @@ export function NavUserWithTeams({
   const { isMobile } = useSidebar();
   const { data: accounts } = useAccounts();
   const [showNewTeamDialog, setShowNewTeamDialog] = React.useState(false);
-  const { theme, setTheme } = useTheme();
 
   // Prepare personal account and team accounts
   const personalAccount = React.useMemo(

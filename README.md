@@ -1,10 +1,10 @@
 <div align="center">
 
-# Biggie - Ask Biggie AI Assistant
+# Ask Biggie - AI Assistant
 
-(your intelligent AI companion)
+Your intelligent AI companion for real-world tasks
 
-![Biggie Screenshot](frontend/public/banner.png)
+![Ask Biggie Screenshot](frontend/public/banner.png)
 
 Ask Biggie - your intelligent AI assistant by Bignoodle AI that helps you accomplish real-world tasks with ease. Through natural conversation, Biggie becomes your digital companion for research, data analysis, and everyday challenges—combining powerful capabilities with an intuitive interface that understands what you need and delivers results.
 
@@ -13,46 +13,36 @@ Biggie's powerful toolkit includes seamless browser automation to navigate the w
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue)](./license)
 [![Discord Follow](https://dcbadge.limes.pink/api/server/Py6pCBUUPw?style=flat)](https://discord.gg/bignoodleai)
 [![Twitter Follow](https://img.shields.io/twitter/follow/bignoodleai)](https://x.com/bignoodleai)
-[![GitHub Repo stars](https://img.shields.io/github/stars/bignoodle-ai/biggie)](https://github.com/bignoodle-ai/biggie)
-[![Issues](https://img.shields.io/github/issues/bignoodle-ai/biggie)](https://github.com/bignoodle-ai/biggie/labels/bug)
-
-<!-- Keep these links. Translations will automatically update with the README. -->
-[Deutsch](https://www.readme-i18n.com/bignoodle-ai/biggie?lang=de) | 
-[Español](https://www.readme-i18n.com/bignoodle-ai/biggie?lang=es) | 
-[français](https://www.readme-i18n.com/bignoodle-ai/biggie?lang=fr) | 
-[日本語](https://www.readme-i18n.com/bignoodle-ai/biggie?lang=ja) | 
-[한국어](https://www.readme-i18n.com/bignoodle-ai/biggie?lang=ko) | 
-[Português](https://www.readme-i18n.com/bignoodle-ai/biggie?lang=pt) | 
-[Русский](https://www.readme-i18n.com/bignoodle-ai/biggie?lang=ru) | 
-[中文](https://www.readme-i18n.com/bignoodle-ai/biggie?lang=zh)
+[![GitHub Repo stars](https://img.shields.io/github/stars/bignoodle-ai/askbiggie)](https://github.com/bignoodle-ai/askbiggie)
+[![Issues](https://img.shields.io/github/issues/bignoodle-ai/askbiggie)](https://github.com/bignoodle-ai/askbiggie/labels/bug)
 
 </div>
 
 ## Table of Contents
 
-- [Biggie Architecture](#project-architecture)
+- [Ask Biggie Architecture](#project-architecture)
   - [Backend API](#backend-api)
   - [Frontend](#frontend)
   - [Agent Docker](#agent-docker)
   - [Supabase Database](#supabase-database)
 - [Use Cases](#use-cases)
 - [Self-Hosting](#self-hosting)
-- [Acknowledgements](#acknowledgements)
+- [Contributing](#contributing)
 - [License](#license)
 
 ## Project Architecture
 
 ![Architecture Diagram](docs/images/diagram.png)
 
-Biggie consists of four main components:
+Ask Biggie consists of four main components:
 
 ### Backend API
 
-Python/FastAPI service that handles REST endpoints, thread management, and LLM integration with Anthropic, and others via LiteLLM.
+Python/FastAPI service that handles REST endpoints, thread management, and LLM integration with Anthropic, OpenAI, OpenRouter, and others via LiteLLM.
 
 ### Frontend
 
-Next.js/React application providing a responsive UI with chat interface, dashboard, etc.
+Next.js/React application providing a responsive UI with chat interface, dashboard, and real-time features.
 
 ### Agent Docker
 
@@ -90,26 +80,26 @@ Handles data persistence with authentication, user management, conversation hist
 
 ## Self-Hosting
 
-Biggie can be self-hosted on your own infrastructure using our comprehensive setup wizard. For a complete guide to self-hosting Biggie, please refer to our [Self-Hosting Guide](./docs/SELF-HOSTING.md).
+Ask Biggie can be self-hosted on your own infrastructure using our comprehensive setup wizard. For a complete guide to self-hosting Ask Biggie, please refer to our [Self-Hosting Guide](./docs/SELF-HOSTING.md).
 
 The setup process includes:
 
 - Setting up a Supabase project for database and authentication
 - Configuring Redis for caching and session management
-- Setting up Daytona for secure agent execution
+- Setting up secure agent execution environment
 - Integrating with LLM providers (Anthropic, OpenAI, OpenRouter, etc.)
 - Configuring web search and scraping capabilities (Tavily, Firecrawl)
-- Setting up QStash for background job processing and workflows
+- Setting up background job processing and workflows
 - Configuring webhook handling for automated tasks
-- Optional integrations (RapidAPI, Smithery for custom agents)
+- Optional integrations for enhanced functionality
 
 ### Quick Start
 
 1. **Clone the repository**:
 
 ```bash
-git clone https://github.com/bignoodle-ai/biggie.git
-cd biggie
+git clone https://github.com/bignoodle-ai/askbiggie.git
+cd askbiggie
 ```
 
 2. **Run the setup wizard**:
@@ -118,7 +108,7 @@ cd biggie
 python setup.py
 ```
 
-The wizard will guide you through 14 steps with progress saving, so you can resume if interrupted.
+The wizard will guide you through all necessary steps with progress saving, so you can resume if interrupted.
 
 3. **Start or stop the containers**:
 
@@ -130,33 +120,26 @@ python start.py
 
 See the [Self-Hosting Guide](./docs/SELF-HOSTING.md) for detailed manual setup instructions.
 
-The wizard will guide you through all necessary steps to get your Biggie instance up and running. For detailed instructions, troubleshooting tips, and advanced configuration options, see the [Self-Hosting Guide](./docs/SELF-HOSTING.md).
+The wizard will guide you through all necessary steps to get your Ask Biggie instance up and running. For detailed instructions, troubleshooting tips, and advanced configuration options, see the [Self-Hosting Guide](./docs/SELF-HOSTING.md).
 
 ## Contributing
 
 We welcome contributions from the community! Please see our [Contributing Guide](./CONTRIBUTING.md) for more details.
 
-## Acknowledgements
-
-### Main Contributors
-
-- [Adam Cohen Hillel](https://x.com/adamcohenhillel)
-- [Dat-lequoc](https://x.com/datlqqq)
-- [Marko Kraemer](https://twitter.com/markokraemer)
-
 ### Technologies
 
-- [Daytona](https://daytona.io/) - Secure agent execution environment
+Ask Biggie is built with modern technologies:
+
 - [Supabase](https://supabase.com/) - Database and authentication
 - [Playwright](https://playwright.dev/) - Browser automation
 - [OpenAI](https://openai.com/) - LLM provider
 - [Anthropic](https://www.anthropic.com/) - LLM provider
+- [OpenRouter](https://openrouter.ai/) - LLM routing
 - [Tavily](https://tavily.com/) - Search capabilities
 - [Firecrawl](https://firecrawl.dev/) - Web scraping capabilities
-- [QStash](https://upstash.com/qstash) - Background job processing and workflows
-- [RapidAPI](https://rapidapi.com/) - API services
-- [Smithery](https://smithery.ai/) - Custom agent development
+- [Next.js](https://nextjs.org/) - Frontend framework
+- [FastAPI](https://fastapi.tiangolo.com/) - Backend API framework
 
 ## License
 
-Bignoodle Biggie is licensed under the Apache License, Version 2.0. See [LICENSE](./LICENSE) for the full license text.
+Ask Biggie is licensed under the Apache License, Version 2.0. See [LICENSE](./LICENSE) for the full license text.
