@@ -559,34 +559,48 @@ async def execute_agent_workflow(
                     token = str(vnc_link).split("token='")[1].split("'")[0]
             except Exception as e:
                 logger.error(f"Error creating sandbox: {str(e)}")
-                await client.table('projects').delete().eq('project_id', project_id).execute()
+                
+                # Mark project as having sandbox failure instead of deleting it
+                await client.table('projects').update({
+                    'sandbox': {
+                        'status': 'failed',
+                        'error': str(e),
+                        'failed_at': datetime.now(timezone.utc).isoformat()
+                    }
+                }).eq('project_id', project_id).execute()
+                
+                # Delete the sandbox if it was partially created
                 if sandbox_id:
                     try: 
                         from sandbox.sandbox import delete_sandbox
                         await delete_sandbox(sandbox_id)
-                    except Exception as e: 
-                        pass
-                raise Exception("Failed to create sandbox")
+                    except Exception as cleanup_e: 
+                        logger.warning(f"Failed to cleanup sandbox {sandbox_id}: {cleanup_e}")
+                
+                # Continue with thread creation - agents can work without sandbox tools
+                logger.warning(f"Continuing without sandbox for project {project_id} - some tools will be unavailable")
+                sandbox_id = None
 
-            update_result = await client.table('projects').update({
-                'sandbox': {
-                    'id': sandbox_id, 
-                    'pass': sandbox_pass, 
-                    'vnc_preview': vnc_url,
-                    'sandbox_url': website_url, 
-                    'token': token
-                }
-            }).eq('project_id', project_id).execute()
+            # Update project with sandbox info (only if sandbox creation was successful)
+            if sandbox_id:
+                update_result = await client.table('projects').update({
+                    'sandbox': {
+                        'id': sandbox_id, 'pass': sandbox_pass, 'vnc_preview': vnc_url,
+                        'sandbox_url': website_url, 'token': token
+                    }
+                }).eq('project_id', project_id).execute()
 
-            if not update_result.data:
-                logger.error(f"Failed to update project {project_id} with new sandbox {sandbox_id}")
-                if sandbox_id:
+                if not update_result.data:
+                    logger.error(f"Failed to update project {project_id} with new sandbox {sandbox_id}")
                     try: 
                         from sandbox.sandbox import delete_sandbox
                         await delete_sandbox(sandbox_id)
                     except Exception as e: 
                         logger.error(f"Error deleting sandbox: {str(e)}")
-                raise Exception("Database update failed")
+                    # Don't raise exception - continue without sandbox
+                    logger.warning(f"Continuing without sandbox for project {project_id}")
+            else:
+                logger.info(f"Project {project_id} created without sandbox - workflow will work with limited functionality")
 
             # 3. Create Thread
             thread_data = {

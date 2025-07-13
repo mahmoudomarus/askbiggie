@@ -214,8 +214,17 @@ class WorkflowTriggerExecutor:
             
         except Exception as e:
             logger.error(f"Failed to create sandbox for workflow project {project_id}: {e}")
-            await client.table('projects').delete().eq('project_id', project_id).execute()
-            raise Exception(f"Failed to create sandbox for workflow execution: {str(e)}")
+            
+            # Mark project as having sandbox failure instead of deleting it
+            await client.table('projects').update({
+                'sandbox': {
+                    'status': 'failed',
+                    'error': str(e),
+                    'failed_at': datetime.now().isoformat()
+                }
+            }).eq('project_id', project_id).execute()
+            
+            logger.warning(f"Continuing workflow without sandbox for project {project_id} - some tools will be unavailable")
         
         thread_data = {
             "thread_id": thread_id,
@@ -622,8 +631,17 @@ class AgentTriggerExecutor:
             
         except Exception as e:
             logger.error(f"Failed to create sandbox for trigger project {project_id}: {e}")
-            await client.table('projects').delete().eq('project_id', project_id).execute()
-            raise Exception(f"Failed to create sandbox for trigger execution: {str(e)}")
+            
+            # Mark project as having sandbox failure instead of deleting it
+            await client.table('projects').update({
+                'sandbox': {
+                    'status': 'failed',
+                    'error': str(e),
+                    'failed_at': datetime.now().isoformat()
+                }
+            }).eq('project_id', project_id).execute()
+            
+            logger.warning(f"Continuing trigger execution without sandbox for project {project_id} - some tools will be unavailable")
         
         thread_data = {
             "thread_id": thread_id,

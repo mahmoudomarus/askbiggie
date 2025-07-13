@@ -37,8 +37,12 @@ class SandboxToolsBase(Tool):
                 project_data = project.data[0]
                 sandbox_info = project_data.get('sandbox', {})
                 
+                # Check if sandbox creation failed
+                if sandbox_info.get('status') == 'failed':
+                    raise ValueError(f"Sandbox creation failed for project {self.project_id}: {sandbox_info.get('error', 'Unknown error')}")
+                
                 if not sandbox_info.get('id'):
-                    raise ValueError(f"No sandbox found for project {self.project_id}")
+                    raise ValueError(f"No sandbox found for project {self.project_id} - sandbox tools unavailable")
                 
                 # Store sandbox info
                 self._sandbox_id = sandbox_info['id']
@@ -61,9 +65,12 @@ class SandboxToolsBase(Tool):
                 #     print("***\033[0m")
                 #     SandboxToolsBase._urls_printed = True
                 
+                logger.debug(f"Successfully ensured sandbox {self._sandbox_id} for project {self.project_id}")
+                
             except Exception as e:
-                logger.error(f"Error retrieving sandbox for project {self.project_id}: {str(e)}", exc_info=True)
-                raise e
+                logger.warning(f"Failed to initialize sandbox for project {self.project_id}: {str(e)}")
+                # Re-raise the exception - tools will need to handle this gracefully
+                raise RuntimeError(f"Sandbox unavailable: {str(e)}")
         
         return self._sandbox
 

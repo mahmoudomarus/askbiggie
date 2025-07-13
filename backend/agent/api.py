@@ -356,15 +356,28 @@ async def start_agent(
         
         project_data = project_result.data[0]
         sandbox_info = project_data.get('sandbox', {})
-        if not sandbox_info.get('id'):
-            raise HTTPException(status_code=404, detail="No sandbox found for this project")
-            
-        sandbox_id = sandbox_info['id']
-        sandbox = await get_or_start_sandbox(sandbox_id)
-        logger.info(f"Successfully started sandbox {sandbox_id} for project {project_id}")
+        
+        # Check if sandbox is available and working
+        if sandbox_info.get('status') == 'failed':
+            logger.warning(f"Sandbox failed for project {project_id}: {sandbox_info.get('error', 'Unknown error')} - starting agent without sandbox tools")
+            sandbox = None
+        elif not sandbox_info.get('id'):
+            logger.warning(f"No sandbox found for project {project_id} - starting agent without sandbox tools")
+            sandbox = None
+        else:
+            try:
+                sandbox_id = sandbox_info['id']
+                sandbox = await get_or_start_sandbox(sandbox_id)
+                logger.info(f"Successfully started sandbox {sandbox_id} for project {project_id}")
+            except Exception as sandbox_error:
+                logger.warning(f"Failed to start sandbox for project {project_id}: {str(sandbox_error)} - starting agent without sandbox tools")
+                sandbox = None
+                
+        # Continue with agent run creation regardless of sandbox status
+        
     except Exception as e:
-        logger.error(f"Failed to start sandbox for project {project_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to initialize sandbox: {str(e)}")
+        logger.error(f"Failed to initialize project {project_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to initialize project: {str(e)}")
 
     agent_run = await client.table('agent_runs').insert({
         "thread_id": thread_id, "status": "running",
@@ -896,27 +909,47 @@ async def initiate_agent_with_files(
               token = str(vnc_link).split("token='")[1].split("'")[0]
         except Exception as e:
             logger.error(f"Error creating sandbox: {str(e)}")
-            await client.table('projects').delete().eq('project_id', project_id).execute()
+            
+            # Mark project as having sandbox failure instead of deleting it
+            await client.table('projects').update({
+                'sandbox': {
+                    'status': 'failed',
+                    'error': str(e),
+                    'failed_at': datetime.now(timezone.utc).isoformat()
+                }
+            }).eq('project_id', project_id).execute()
+            
+            # Delete the sandbox if it was partially created
             if sandbox_id:
-              try: await delete_sandbox(sandbox_id)
-              except Exception as e: pass
-            raise Exception("Failed to create sandbox")
+                try: 
+                    await delete_sandbox(sandbox_id)
+                except Exception as cleanup_e: 
+                    logger.warning(f"Failed to cleanup sandbox {sandbox_id}: {cleanup_e}")
+            
+            # Continue with thread creation - agents can work without sandbox tools
+            logger.warning(f"Continuing without sandbox for project {project_id} - some tools will be unavailable")
+            sandbox_id = None
 
 
-        # Update project with sandbox info
-        update_result = await client.table('projects').update({
-            'sandbox': {
-                'id': sandbox_id, 'pass': sandbox_pass, 'vnc_preview': vnc_url,
-                'sandbox_url': website_url, 'token': token
-            }
-        }).eq('project_id', project_id).execute()
+        # Update project with sandbox info (only if sandbox creation was successful)
+        if sandbox_id:
+            update_result = await client.table('projects').update({
+                'sandbox': {
+                    'id': sandbox_id, 'pass': sandbox_pass, 'vnc_preview': vnc_url,
+                    'sandbox_url': website_url, 'token': token
+                }
+            }).eq('project_id', project_id).execute()
 
-        if not update_result.data:
-            logger.error(f"Failed to update project {project_id} with new sandbox {sandbox_id}")
-            if sandbox_id:
-              try: await delete_sandbox(sandbox_id)
-              except Exception as e: logger.error(f"Error deleting sandbox: {str(e)}")
-            raise Exception("Database update failed")
+            if not update_result.data:
+                logger.error(f"Failed to update project {project_id} with new sandbox {sandbox_id}")
+                try: 
+                    await delete_sandbox(sandbox_id)
+                except Exception as e: 
+                    logger.error(f"Error deleting sandbox: {str(e)}")
+                # Don't raise exception - continue without sandbox
+                logger.warning(f"Continuing without sandbox for project {project_id}")
+        else:
+            logger.info(f"Project {project_id} created without sandbox - agents will work with limited functionality")
 
         # 3. Create Thread
         thread_data = {
