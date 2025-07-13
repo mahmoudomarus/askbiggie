@@ -1370,5 +1370,10 @@ class SetupWizard:
 
 
 if __name__ == "__main__":
+    # Skip interactive wizard in Heroku/CI environments
+    if os.environ.get('DYNO') or os.environ.get('CI') or os.environ.get('HEROKU'):
+        print("Skipping interactive setup wizard in automated environment")
+        sys.exit(0)
+    
     wizard = SetupWizard()
     wizard.run()
