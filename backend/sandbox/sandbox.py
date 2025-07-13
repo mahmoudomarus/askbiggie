@@ -107,9 +107,9 @@ async def create_sandbox(password: str, project_id: str = None) -> AsyncSandbox:
             "CHROME_CDP": ""
         },
         resources=Resources(
-            cpu=1,         # Reduced from 2 to 1 CPU
-            memory=2,      # Reduced from 4 to 2GB memory  
-            disk=3,        # Reduced from 5 to 3GB disk
+            cpu=2,         # Restored from 1 to 2 CPU for better performance
+            memory=6,      # INCREASED from 2 to 6GB memory to handle image processing
+            disk=8,        # Increased from 3 to 8GB disk for larger files
         ),
         auto_stop_interval=10,     # Reduced from 15 to 10 minutes
         auto_archive_interval=12 * 60,  # Reduced from 24 to 12 hours
