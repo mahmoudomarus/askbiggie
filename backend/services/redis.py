@@ -35,10 +35,10 @@ def initialize():
         parsed_url = urlparse(redis_url)
         use_ssl = parsed_url.scheme == 'rediss'
         
-        # Connection pool configuration
-        max_connections = 128
-        socket_timeout = 15.0
-        connect_timeout = 10.0
+        # Connection pool configuration optimized for Redis Mini (20 connection limit)
+        max_connections = 15  # Use 15 out of 20 available connections for safety
+        socket_timeout = 30.0  # Increase timeout for better reliability
+        connect_timeout = 15.0  # Increase connection timeout
         retry_on_timeout = not (os.getenv("REDIS_RETRY_ON_TIMEOUT", "True").lower() != "true")
         
         # SSL configuration for secure connections
