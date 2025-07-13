@@ -497,9 +497,11 @@ async def can_use_model(client, user_id: str, model_name: str):
             if user_email in unlimited_users:
                 logger.info(f"✅ User {user_email} is in unlimited whitelist - bypassing model restrictions")
                 return True, "Unlimited access granted", {
-                    "price_id": "unlimited",
-                    "plan_name": "Unlimited Access",
-                    "minutes_limit": "no limit"
+                    "price_id": "price_1QG7yNP9WgWNOwIGPEg9MJGy",  # $200 plan price_id
+                    "plan_name": "Pro ($200)",
+                    "minutes_limit": "unlimited",
+                    "subscription_status": "active",
+                    "tier": "tier_200_1000"
                 }
             else:
                 logger.info(f"❌ User {user_email} is NOT in unlimited whitelist for model access")
@@ -538,9 +540,11 @@ async def check_billing_status(client, user_id: str) -> Tuple[bool, str, Optiona
             if user_email in unlimited_users:
                 logger.info(f"✅ User {user_email} is in unlimited whitelist - bypassing billing restrictions")
                 return True, "Unlimited access granted", {
-                    "price_id": "unlimited",
-                    "plan_name": "Unlimited Access",
-                    "minutes_limit": "no limit"
+                    "price_id": "price_1QG7yNP9WgWNOwIGPEg9MJGy",  # $200 plan price_id
+                    "plan_name": "Pro ($200)",
+                    "minutes_limit": "unlimited",
+                    "subscription_status": "active",
+                    "tier": "tier_200_1000"
                 }
             else:
                 logger.info(f"❌ User {user_email} is NOT in unlimited whitelist for billing")
@@ -973,6 +977,30 @@ async def get_subscription(
 ):
     """Get the current subscription status for the current user, including scheduled changes."""
     try:
+        # Check if user is in unlimited whitelist first
+        db = DBConnection()
+        client = await db.client
+        
+        try:
+            user_result = await client.auth.admin.get_user_by_id(current_user_id)
+            if user_result and user_result.user and user_result.user.email:
+                user_email = user_result.user.email
+                unlimited_users = get_unlimited_users()
+                if user_email in unlimited_users:
+                    logger.info(f"✅ User {user_email} is unlimited - returning Pro ($200) subscription status")
+                    pro_tier_info = SUBSCRIPTION_TIERS.get("price_1QG7yNP9WgWNOwIGPEg9MJGy", {})
+                    return SubscriptionStatus(
+                        status="active",
+                        plan_name="Pro ($200)",
+                        price_id="price_1QG7yNP9WgWNOwIGPEg9MJGy",
+                        minutes_limit=pro_tier_info.get('minutes', 1000),
+                        cost_limit=pro_tier_info.get('cost', 200.0),
+                        current_usage=0.0,  # Unlimited users don't consume usage
+                        cancel_at_period_end=False
+                    )
+        except Exception as e:
+            logger.warning(f"Could not check unlimited user status in subscription endpoint: {str(e)}")
+        
         # Get subscription from Stripe (this helper already handles filtering/cleanup)
         subscription = await get_user_subscription(current_user_id)
         # print("Subscription data for status:", subscription)
@@ -1219,7 +1247,7 @@ async def get_available_models(
             
             return {
                 "models": model_info,
-                "subscription_tier": "Unlimited Access",
+                "subscription_tier": "Pro ($200)",
                 "total_models": len(model_info)
             }
         
