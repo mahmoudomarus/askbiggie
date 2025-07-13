@@ -33,9 +33,9 @@ if cloudamqp_url:
     logger.info(f"Using CloudAMQP broker: {parsed.hostname}")
 else:
     # Fallback to individual host/port configuration
-    rabbitmq_host = os.getenv('RABBITMQ_HOST', 'rabbitmq')
-    rabbitmq_port = int(os.getenv('RABBITMQ_PORT', 5672))
-    rabbitmq_broker = RabbitmqBroker(host=rabbitmq_host, port=rabbitmq_port, middleware=[dramatiq.middleware.AsyncIO()])
+rabbitmq_host = os.getenv('RABBITMQ_HOST', 'rabbitmq')
+rabbitmq_port = int(os.getenv('RABBITMQ_PORT', 5672))
+rabbitmq_broker = RabbitmqBroker(host=rabbitmq_host, port=rabbitmq_port, middleware=[dramatiq.middleware.AsyncIO()])
     logger.info(f"Using RabbitMQ broker: {rabbitmq_host}:{rabbitmq_port}")
 
 dramatiq.set_broker(rabbitmq_broker)

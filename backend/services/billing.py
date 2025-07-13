@@ -459,7 +459,7 @@ async def get_allowed_models_for_user(client, user_id: str):
                 logger.info(f"❌ User {user_email} is NOT in unlimited whitelist")
     except Exception as e:
         logger.warning(f"Could not check unlimited user status: {str(e)}")
-    
+
     subscription = await get_user_subscription(user_id)
     tier_name = 'free'
     

@@ -583,15 +583,15 @@ async def execute_agent_workflow(
 
             # Update project with sandbox info (only if sandbox creation was successful)
             if sandbox_id:
-                update_result = await client.table('projects').update({
-                    'sandbox': {
+            update_result = await client.table('projects').update({
+                'sandbox': {
                         'id': sandbox_id, 'pass': sandbox_pass, 'vnc_preview': vnc_url,
                         'sandbox_url': website_url, 'token': token
-                    }
-                }).eq('project_id', project_id).execute()
+                }
+            }).eq('project_id', project_id).execute()
 
-                if not update_result.data:
-                    logger.error(f"Failed to update project {project_id} with new sandbox {sandbox_id}")
+            if not update_result.data:
+                logger.error(f"Failed to update project {project_id} with new sandbox {sandbox_id}")
                     try: 
                         from sandbox.sandbox import delete_sandbox
                         await delete_sandbox(sandbox_id)

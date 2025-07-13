@@ -366,9 +366,9 @@ async def start_agent(
             sandbox = None
         else:
             try:
-                sandbox_id = sandbox_info['id']
-                sandbox = await get_or_start_sandbox(sandbox_id)
-                logger.info(f"Successfully started sandbox {sandbox_id} for project {project_id}")
+        sandbox_id = sandbox_info['id']
+        sandbox = await get_or_start_sandbox(sandbox_id)
+        logger.info(f"Successfully started sandbox {sandbox_id} for project {project_id}")
             except Exception as sandbox_error:
                 logger.warning(f"Failed to start sandbox for project {project_id}: {str(sandbox_error)} - starting agent without sandbox tools")
                 sandbox = None
@@ -933,15 +933,15 @@ async def initiate_agent_with_files(
 
         # Update project with sandbox info (only if sandbox creation was successful)
         if sandbox_id:
-            update_result = await client.table('projects').update({
-                'sandbox': {
-                    'id': sandbox_id, 'pass': sandbox_pass, 'vnc_preview': vnc_url,
-                    'sandbox_url': website_url, 'token': token
-                }
-            }).eq('project_id', project_id).execute()
+        update_result = await client.table('projects').update({
+            'sandbox': {
+                'id': sandbox_id, 'pass': sandbox_pass, 'vnc_preview': vnc_url,
+                'sandbox_url': website_url, 'token': token
+            }
+        }).eq('project_id', project_id).execute()
 
-            if not update_result.data:
-                logger.error(f"Failed to update project {project_id} with new sandbox {sandbox_id}")
+        if not update_result.data:
+            logger.error(f"Failed to update project {project_id} with new sandbox {sandbox_id}")
                 try: 
                     await delete_sandbox(sandbox_id)
                 except Exception as e: 
