@@ -26,21 +26,11 @@ TOKEN_PRICE_MULTIPLIER = 1.5
 # Initialize router
 router = APIRouter(prefix="/billing", tags=["billing"])
 
-# Unlimited tier users - add your user IDs here
-UNLIMITED_TIER_USERS = {
-    # Add user IDs that should have unlimited access
-    # Example: "user-uuid-here": "Unlimited Admin",
+# Unlimited users whitelist - these users bypass all billing restrictions
+UNLIMITED_USERS = {
+    "mahmoudomarus@gmail.com",
+    "alpay@bignoodle.com"
 }
-
-# Load unlimited users from environment variable if available
-import json
-import os
-try:
-    unlimited_users_str = os.getenv('UNLIMITED_TIER_USERS', '{}')
-    UNLIMITED_TIER_USERS.update(json.loads(unlimited_users_str))
-    logger.info(f"Loaded {len(UNLIMITED_TIER_USERS)} unlimited tier users from environment")
-except Exception as e:
-    logger.warning(f"Error loading unlimited tier users from environment: {e}")
 
 def get_model_pricing(model: str) -> tuple[float, float] | None:
     """
@@ -429,13 +419,22 @@ def calculate_token_cost(prompt_tokens: int, completion_tokens: int, model: str)
         return 0.0
 
 async def get_allowed_models_for_user(client, user_id: str):
-    """
-    Get the list of models allowed for a user based on their subscription tier.
+    """Get list of allowed models for a user based on their subscription tier."""
+    if config.ENV_MODE == EnvMode.LOCAL:
+        logger.info("Running in local development mode - billing checks are disabled")
+        return MODEL_ACCESS_TIERS['tier_200_1000']  # Return highest tier models in local mode
     
-    Returns:
-        List of model names allowed for the user's subscription tier.
-    """
-
+    # Check if user is in unlimited whitelist
+    try:
+        user_result = await client.auth.admin.get_user_by_id(user_id)
+        if user_result and user_result.user and user_result.user.email:
+            user_email = user_result.user.email
+            if user_email in UNLIMITED_USERS:
+                logger.info(f"User {user_email} is in unlimited whitelist - granting access to all models")
+                return MODEL_ACCESS_TIERS['tier_200_1000']  # Return highest tier models
+    except Exception as e:
+        logger.warning(f"Could not check unlimited user status: {str(e)}")
+    
     subscription = await get_user_subscription(user_id)
     tier_name = 'free'
     
@@ -456,15 +455,6 @@ async def get_allowed_models_for_user(client, user_id: str):
 
 
 async def can_use_model(client, user_id: str, model_name: str):
-    # Check for unlimited tier users first
-    if user_id in UNLIMITED_TIER_USERS:
-        logger.info(f"Unlimited tier user {user_id} ({UNLIMITED_TIER_USERS[user_id]}) - model access granted")
-        return True, f"Unlimited tier access - {UNLIMITED_TIER_USERS[user_id]}", {
-            "price_id": "unlimited",
-            "plan_name": "Unlimited Tier",
-            "minutes_limit": "unlimited"
-        }
-    
     if config.ENV_MODE == EnvMode.LOCAL:
         logger.info("Running in local development mode - billing checks are disabled")
         return True, "Local development mode - billing disabled", {
@@ -472,6 +462,21 @@ async def can_use_model(client, user_id: str, model_name: str):
             "plan_name": "Local Development",
             "minutes_limit": "no limit"
         }
+    
+    # Check if user is in unlimited whitelist
+    try:
+        user_result = await client.auth.admin.get_user_by_id(user_id)
+        if user_result and user_result.user and user_result.user.email:
+            user_email = user_result.user.email
+            if user_email in UNLIMITED_USERS:
+                logger.info(f"User {user_email} is in unlimited whitelist - bypassing model restrictions")
+                return True, "Unlimited access granted", {
+                    "price_id": "unlimited",
+                    "plan_name": "Unlimited Access",
+                    "minutes_limit": "no limit"
+                }
+    except Exception as e:
+        logger.warning(f"Could not check unlimited user status: {str(e)}")
         
     allowed_models = await get_allowed_models_for_user(client, user_id)
     resolved_model = MODEL_NAME_ALIASES.get(model_name, model_name)
@@ -487,16 +492,6 @@ async def check_billing_status(client, user_id: str) -> Tuple[bool, str, Optiona
     Returns:
         Tuple[bool, str, Optional[Dict]]: (can_run, message, subscription_info)
     """
-    # Check for unlimited tier users first
-    if user_id in UNLIMITED_TIER_USERS:
-        logger.info(f"Unlimited tier user {user_id} ({UNLIMITED_TIER_USERS[user_id]}) - billing checks bypassed")
-        return True, f"Unlimited tier access - {UNLIMITED_TIER_USERS[user_id]}", {
-            "price_id": "unlimited",
-            "plan_name": "Unlimited Tier",
-            "minutes_limit": "unlimited",
-            "cost_limit": "unlimited"
-        }
-    
     if config.ENV_MODE == EnvMode.LOCAL:
         logger.info("Running in local development mode - billing checks are disabled")
         return True, "Local development mode - billing disabled", {
@@ -504,6 +499,21 @@ async def check_billing_status(client, user_id: str) -> Tuple[bool, str, Optiona
             "plan_name": "Local Development",
             "minutes_limit": "no limit"
         }
+    
+    # Check if user is in unlimited whitelist
+    try:
+        user_result = await client.auth.admin.get_user_by_id(user_id)
+        if user_result and user_result.user and user_result.user.email:
+            user_email = user_result.user.email
+            if user_email in UNLIMITED_USERS:
+                logger.info(f"User {user_email} is in unlimited whitelist - bypassing billing restrictions")
+                return True, "Unlimited access granted", {
+                    "price_id": "unlimited",
+                    "plan_name": "Unlimited Access",
+                    "minutes_limit": "no limit"
+                }
+    except Exception as e:
+        logger.warning(f"Could not check unlimited user status: {str(e)}")
     
     # Get current subscription
     subscription = await get_user_subscription(user_id)
@@ -1148,6 +1158,35 @@ async def get_available_models(
                 "total_models": len(model_info)
             }
         
+        # Check if user is in unlimited whitelist
+        user_is_unlimited = False
+        try:
+            user_result = await client.auth.admin.get_user_by_id(current_user_id)
+            if user_result and user_result.user and user_result.user.email:
+                user_email = user_result.user.email
+                if user_email in UNLIMITED_USERS:
+                    user_is_unlimited = True
+                    logger.info(f"User {user_email} is in unlimited whitelist - showing all models as available")
+        except Exception as e:
+            logger.warning(f"Could not check unlimited user status: {str(e)}")
+        
+        # For unlimited users, return all models
+        if user_is_unlimited:
+            model_info = []
+            for short_name, full_name in MODEL_NAME_ALIASES.items():
+                model_info.append({
+                    "id": full_name,
+                    "display_name": short_name,
+                    "short_name": short_name,
+                    "requires_subscription": False  # No restrictions for unlimited users
+                })
+            
+            return {
+                "models": model_info,
+                "subscription_tier": "Unlimited Access",
+                "total_models": len(model_info)
+            }
+        
         # For non-local mode, get list of allowed models for this user
         allowed_models = await get_allowed_models_for_user(client, current_user_id)
         free_tier_models = MODEL_ACCESS_TIERS.get('free', [])
@@ -1328,36 +1367,3 @@ async def get_usage_logs_endpoint(
     except Exception as e:
         logger.error(f"Error getting usage logs: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting usage logs: {str(e)}")
-
-@router.get("/debug/user-info")
-async def get_user_info(
-    current_user_id: str = Depends(get_current_user_id_from_jwt)
-):
-    """Debug endpoint to get current user ID and subscription info."""
-    try:
-        # Get Supabase client
-        db = DBConnection()
-        client = await db.client
-        
-        # Get user email from auth.users
-        user_result = await client.auth.admin.get_user_by_id(current_user_id)
-        email = user_result.user.email if user_result else "Unknown"
-        
-        # Get subscription info
-        subscription = await get_user_subscription(current_user_id)
-        
-        # Check if user is in unlimited tier
-        is_unlimited = current_user_id in UNLIMITED_TIER_USERS
-        
-        return {
-            "user_id": current_user_id,
-            "email": email,
-            "is_unlimited": is_unlimited,
-            "unlimited_label": UNLIMITED_TIER_USERS.get(current_user_id, None),
-            "subscription": subscription,
-            "total_unlimited_users": len(UNLIMITED_TIER_USERS)
-        }
-        
-    except Exception as e:
-        logger.error(f"Error getting user info: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))

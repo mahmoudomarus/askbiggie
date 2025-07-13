@@ -12,7 +12,7 @@ MODELS = {
     },
         
     "openrouter/deepseek/deepseek-chat": {
-        "aliases": ["deepseek"],
+        "aliases": ["deepseek", "deepseek-chat"],
         "pricing": {
             "input_cost_per_million_tokens": 0.38,
             "output_cost_per_million_tokens": 0.89
@@ -20,7 +20,7 @@ MODELS = {
         "tier_availability": ["free", "paid"]
     },
     "openrouter/qwen/qwen3-235b-a22b": {
-        "aliases": ["qwen3"],
+        "aliases": ["qwen3", "qwen", "qwen-235b"],
         "pricing": {
             "input_cost_per_million_tokens": 0.13,
             "output_cost_per_million_tokens": 0.60
@@ -28,7 +28,7 @@ MODELS = {
         "tier_availability": ["free", "paid"]
     },
     "openrouter/google/gemini-2.5-flash-preview-05-20": {
-        "aliases": ["gemini-flash-2.5"],
+        "aliases": ["gemini-flash-2.5", "gemini-flash", "gemini-2.5-flash"],
         "pricing": {
             "input_cost_per_million_tokens": 0.15,
             "output_cost_per_million_tokens": 0.60
