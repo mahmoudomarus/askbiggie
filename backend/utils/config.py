@@ -176,7 +176,7 @@ class Configuration:
     OPENROUTER_API_KEY: Optional[str] = None
     XAI_API_KEY: Optional[str] = None
     OPENROUTER_API_BASE: Optional[str] = "https://openrouter.ai/api/v1"
-    OR_SITE_URL: Optional[str] = "https://askbiggie.bignoodle.com"
+    OR_SITE_URL: Optional[str] = "https://askbiggie.ai"
     OR_APP_NAME: Optional[str] = "Bignoodle AI"    
     
     # AWS Bedrock credentials
