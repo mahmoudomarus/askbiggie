@@ -143,6 +143,12 @@ def _generate_model_structures():
         elif model_name.startswith("openrouter/google/"):
             legacy_name = model_name.replace("openrouter/", "")
             pricing[legacy_name] = config["pricing"]
+        elif model_name.startswith("openrouter/x-ai/"):
+            legacy_name = model_name.replace("openrouter/", "")
+            pricing[legacy_name] = config["pricing"]
+            # Also add pricing for the short alias
+            for alias in config["aliases"]:
+                pricing[alias] = config["pricing"]
         elif model_name.startswith("anthropic/"):
             # Add anthropic/claude-sonnet-4 alias for claude-sonnet-4-20250514
             if "claude-sonnet-4-20250514" in model_name:

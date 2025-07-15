@@ -293,9 +293,25 @@ class SandboxShellTool(SandboxToolsBase):
             # Check if session exists
             check_result = await self._execute_raw_command(f"tmux has-session -t {session_name} 2>/dev/null || echo 'not_exists'")
             if "not_exists" in check_result.get("output", ""):
-                return self.fail_response(f"Tmux session '{session_name}' does not exist.")
+                # Session doesn't exist - it likely completed and terminated naturally
+                # Try to get recent tmux server info to see if there are any sessions
+                list_result = await self._execute_raw_command("tmux list-sessions 2>/dev/null || echo 'No sessions'")
+                session_list = list_result.get("output", "").strip()
+                
+                if "No sessions" in session_list or not session_list:
+                    session_info = "No active tmux sessions found."
+                else:
+                    active_sessions = [line.split(':')[0].strip() for line in session_list.split('\n') if line.strip()]
+                    session_info = f"Active sessions: {', '.join(active_sessions)}"
+                
+                return self.success_response({
+                    "output": f"Session '{session_name}' has completed and terminated. The command likely finished successfully.\n\nTo start a new session, run another command with a different session name or reuse this session name for a new command.",
+                    "session_name": session_name,
+                    "status": f"Session completed/terminated. {session_info}",
+                    "session_exists": False
+                })
             
-            # Get output from tmux pane
+            # Session exists - get output from tmux pane
             output_result = await self._execute_raw_command(f"tmux capture-pane -t {session_name} -p -S - -E -")
             output = output_result.get("output", "")
             
@@ -309,7 +325,8 @@ class SandboxShellTool(SandboxToolsBase):
             return self.success_response({
                 "output": output,
                 "session_name": session_name,
-                "status": termination_status
+                "status": termination_status,
+                "session_exists": True
             })
                 
         except Exception as e:
