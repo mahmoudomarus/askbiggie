@@ -467,7 +467,7 @@ async def get_allowed_models_for_user(client, user_id: str):
         if subscription.get('items') and subscription['items'].get('data') and len(subscription['items']['data']) > 0:
             price_id = subscription['items']['data'][0]['price']['id']
         else:
-            price_id = subscription.get('price_id', config.STRIPE_TIER_25_200_ID)
+            price_id = subscription.get('price_id', config.STRIPE_FREE_TIER_ID)
         
         # Get tier info for this price_id
         tier_info = SUBSCRIPTION_TIERS.get(price_id)
@@ -544,7 +544,7 @@ async def check_billing_status(client, user_id: str) -> Tuple[bool, str, Optiona
     if subscription.get('items') and subscription['items'].get('data') and len(subscription['items']['data']) > 0:
         price_id = subscription['items']['data'][0]['price']['id']
     else:
-        price_id = subscription.get('price_id', config.STRIPE_TIER_25_200_ID)
+        price_id = subscription.get('price_id', config.STRIPE_FREE_TIER_ID)
     
     # Get tier info - default to free tier if not found
     tier_info = SUBSCRIPTION_TIERS.get(price_id)
