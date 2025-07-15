@@ -954,13 +954,37 @@ async def get_subscription(
 ):
     """Get the current subscription status for the current user, including scheduled changes."""
     try:
+        # Get Supabase client
+        db = DBConnection()
+        client = await db.client
+        
+        # Check if user is in unlimited whitelist FIRST
+        try:
+            user_result = await client.auth.admin.get_user_by_id(current_user_id)
+            if user_result and user_result.user and user_result.user.email:
+                user_email = user_result.user.email
+                unlimited_users = get_unlimited_users()
+                if user_email in unlimited_users:
+                    logger.info(f"✅ User {user_email} is in unlimited whitelist - returning unlimited subscription status")
+                    # Calculate current usage
+                    current_usage = await calculate_monthly_usage(client, current_user_id)
+                    # Return subscription status that shows unlimited tier
+                    return SubscriptionStatus(
+                        status="active",  # Show as active, not no_subscription
+                        plan_name="Ultra",  # Match the $200 plan name from frontend
+                        price_id=config.STRIPE_TIER_25_200_ID,  # Use $200 tier price ID
+                        minutes_limit=1500,  # 25 hours like $200 tier
+                        cost_limit=205,  # $200 + $5 like $200 tier
+                        current_usage=current_usage
+                    )
+        except Exception as e:
+            logger.warning(f"Could not check unlimited user status in subscription endpoint: {str(e)}")
+        
         # Get subscription from Stripe (this helper already handles filtering/cleanup)
         subscription = await get_user_subscription(current_user_id)
         # print("Subscription data for status:", subscription)
         
         # Calculate current usage
-        db = DBConnection()
-        client = await db.client
         current_usage = await calculate_monthly_usage(client, current_user_id)
 
         if not subscription:
