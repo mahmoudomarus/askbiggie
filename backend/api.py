@@ -135,7 +135,9 @@ async def log_requests_middleware(request: Request, call_next):
 allowed_origins = [
     "https://askbiggie.ai", 
     "https://www.askbiggie.ai",
-    "https://askbiggie.vercel.app"  # Add production Vercel domain
+    "https://askbiggie.vercel.app",  # Add production Vercel domain
+    "https://askbiggie.bignoodle.com",  # Add custom domain
+    "https://www.askbiggie.bignoodle.com"  # Add www version of custom domain
 ]
 allow_origin_regex = None
 
@@ -197,11 +199,13 @@ async def health_check():
     }
 
 @api_router.get("/health-docker")
-async def health_check():
+async def health_check_docker():
     logger.info("Health docker check endpoint called")
     try:
         client = await redis.get_client()
-        await client.ping()
+        if client:
+            await client.ping()
+        
         db = DBConnection()
         await db.initialize()
         db_client = await db.client
