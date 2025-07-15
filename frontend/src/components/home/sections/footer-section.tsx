@@ -49,15 +49,15 @@ export function FooterSection() {
         </div>
         {tablet && (
           <div className="z-10 col-span-full opacity-30 mt-10">
-            <FlickeringGrid
+          <FlickeringGrid
               className="size-full"
               squareSize={4}
               gridGap={6}
-              color="#6B7280"
+            color="#6B7280"
               maxOpacity={0.5}
-              flickerChance={0.1}
-            />
-          </div>
+            flickerChance={0.1}
+          />
+        </div>
         )}
       </div>
     </footer>

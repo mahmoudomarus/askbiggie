@@ -26,6 +26,32 @@ TOKEN_PRICE_MULTIPLIER = 1.5
 # Initialize router
 router = APIRouter(prefix="/billing", tags=["billing"])
 
+# Unlimited users whitelist - these users bypass all billing restrictions
+UNLIMITED_USERS = {
+    "mahmoudomarus@gmail.com",
+    "alpay@bignoodle.com"
+}
+
+def get_unlimited_users():
+    """Get unlimited users from both hardcoded list and environment variable."""
+    users = set(UNLIMITED_USERS)
+    
+    # Also check environment variable for additional unlimited users
+    import os
+    import json
+    try:
+        env_users = os.getenv('UNLIMITED_TIER_USERS', '[]')
+        if env_users:
+            additional_users = json.loads(env_users)
+            if isinstance(additional_users, list):
+                users.update(additional_users)
+            logger.info(f"Loaded {len(additional_users)} unlimited users from environment")
+    except Exception as e:
+        logger.warning(f"Could not parse UNLIMITED_TIER_USERS environment variable: {e}")
+    
+    logger.info(f"Total unlimited users configured: {len(users)}")
+    return users
+
 def get_model_pricing(model: str) -> tuple[float, float] | None:
     """
     Get pricing for a model. Returns (input_cost_per_million, output_cost_per_million) or None.
@@ -413,12 +439,25 @@ def calculate_token_cost(prompt_tokens: int, completion_tokens: int, model: str)
         return 0.0
 
 async def get_allowed_models_for_user(client, user_id: str):
-    """
-    Get the list of models allowed for a user based on their subscription tier.
+    """Get the list of models allowed for a user based on their subscription tier."""
+    if config.ENV_MODE == EnvMode.LOCAL:
+        logger.info("Running in local development mode - billing checks are disabled")
+        return MODEL_ACCESS_TIERS['tier_200_1000']  # Return highest tier models in local mode
     
-    Returns:
-        List of model names allowed for the user's subscription tier.
-    """
+    # Check if user is in unlimited whitelist
+    try:
+        user_result = await client.auth.admin.get_user_by_id(user_id)
+        if user_result and user_result.user and user_result.user.email:
+            user_email = user_result.user.email
+            unlimited_users = get_unlimited_users()
+            logger.info(f"🔍 Checking model access for user {user_email}")
+            if user_email in unlimited_users:
+                logger.info(f"✅ User {user_email} is in unlimited whitelist - granting access to all models")
+                return MODEL_ACCESS_TIERS['tier_200_1000']  # Highest tier models
+            else:
+                logger.info(f"❌ User {user_email} is NOT in unlimited whitelist - checking subscription")
+    except Exception as e:
+        logger.warning(f"Could not check unlimited user status: {str(e)}")
 
     subscription = await get_user_subscription(user_id)
     tier_name = 'free'
@@ -469,6 +508,25 @@ async def check_billing_status(client, user_id: str) -> Tuple[bool, str, Optiona
             "plan_name": "Local Development",
             "minutes_limit": "no limit"
         }
+    
+    # Check if user is in unlimited whitelist
+    try:
+        user_result = await client.auth.admin.get_user_by_id(user_id)
+        if user_result and user_result.user and user_result.user.email:
+            user_email = user_result.user.email
+            unlimited_users = get_unlimited_users()
+            logger.info(f"🔍 Checking billing status for user {user_email}")
+            if user_email in unlimited_users:
+                logger.info(f"✅ User {user_email} is in unlimited whitelist - bypassing billing checks")
+                return True, "Unlimited tier user - no billing restrictions", {
+                    "price_id": "unlimited",
+                    "plan_name": "Unlimited ($200 tier)",
+                    "minutes_limit": "unlimited"
+                }
+            else:
+                logger.info(f"❌ User {user_email} is NOT in unlimited whitelist - checking billing")
+    except Exception as e:
+        logger.warning(f"Could not check unlimited user status: {str(e)}")
     
     # Get current subscription
     subscription = await get_user_subscription(user_id)
