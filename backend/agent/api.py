@@ -888,20 +888,30 @@ async def initiate_agent_with_files(
                 "created_at": datetime.now(timezone.utc).isoformat()
             }).execute()
             
-            # Store user message
+            # Store user message with correct schema
+            user_message_id = str(uuid.uuid4())
             await db_client.table("messages").insert({
+                "message_id": user_message_id,
                 "thread_id": thread_id,
-                "type": "user_message", 
-                "content": {"text": prompt},
-                "created_at": datetime.now(timezone.utc).isoformat()
+                "type": "user", 
+                "is_llm_message": False,
+                "content": prompt,  # Store as text directly, not as object
+                "metadata": "{}",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
             }).execute()
             
-            # Store assistant response
+            # Store assistant response with correct schema
+            assistant_message_id = str(uuid.uuid4())
             await db_client.table("messages").insert({
+                "message_id": assistant_message_id,
                 "thread_id": thread_id,
-                "type": "assistant_message",
-                "content": {"text": content},
-                "created_at": datetime.now(timezone.utc).isoformat()
+                "type": "assistant",
+                "is_llm_message": True,
+                "content": content,  # Store as text directly, not as object
+                "metadata": "{}",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
             }).execute()
             
             return InitiateAgentResponse(
