@@ -846,8 +846,14 @@ async def initiate_agent_with_files(
     # Debug: Log what agent_id we received
     logger.info(f"🔍 Agent initiation - received agent_id: '{agent_id}' (type: {type(agent_id)})")
     
-    # Check if this is Fast Biggie (simple chat mode)
-    if agent_id == 'fast_biggie':
+    # Check if this is Fast Biggie (simple chat mode) - handle various ways it might be sent
+    is_fast_biggie = (
+        agent_id == 'fast_biggie' or 
+        agent_id == '"fast_biggie"' or 
+        (hasattr(agent_id, 'strip') and agent_id.strip() == 'fast_biggie')
+    )
+    
+    if is_fast_biggie:
         logger.info("🚀 Fast Biggie mode detected - routing to simple chat")
         # Route to simple chat instead of complex agent system
         from services.llm import make_llm_api_call
