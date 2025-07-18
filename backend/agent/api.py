@@ -1337,6 +1337,31 @@ async def get_agent(agent_id: str, user_id: str = Depends(get_current_user_id_fr
             detail="Custom agents currently disabled. This feature is not available at the moment."
         )
     
+    # Handle special case for Fast Biggie
+    if agent_id == "fast_biggie":
+        return AgentResponse(
+            agent_id="fast_biggie",
+            account_id=user_id,  # Use current user's account
+            name="Fast Biggie",
+            description="Quick AI conversations without tools - perfect for fast questions and research",
+            system_prompt="You are Fast Biggie, a streamlined AI assistant focused on quick, helpful responses without complex tool usage.",
+            configured_mcps=[],
+            custom_mcps=[],
+            agentpress_tools={},
+            is_default=False,
+            is_public=True,
+            marketplace_published_at=None,
+            download_count=0,
+            tags=["fast", "simple", "chat"],
+            avatar="🚀",
+            avatar_color="#FF4A12",
+            created_at="2025-01-01T00:00:00Z",
+            updated_at="2025-01-01T00:00:00Z",
+            current_version_id=None,
+            version_count=1,
+            current_version=None
+        )
+    
     logger.info(f"Fetching agent {agent_id} for user: {user_id}")
     client = await db.client
     

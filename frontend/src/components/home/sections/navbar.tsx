@@ -219,7 +219,7 @@ export function Navbar() {
                               element.scrollIntoView({
                                 behavior: 'smooth',
                               });
-                              setIsDrawerOpen(false);
+                            setIsDrawerOpen(false);
                             }
                           }}
                           className="font-normal text-muted-foreground hover:text-foreground transition-colors"
@@ -254,5 +254,5 @@ export function Navbar() {
         )}
       </AnimatePresence>
     </header>
-  );
+  ); 
 }
