@@ -8,10 +8,122 @@ https://askbiggie-a4fdf63d7e8b.herokuapp.com/api/chat
 ```
 
 ## Authentication
+
 All endpoints require JWT authentication via Authorization header:
 ```
 Authorization: Bearer <your_jwt_token>
 ```
+
+### How to Get JWT Tokens
+
+#### Method 1: Use the Frontend (Recommended)
+The easiest way to get a JWT token is through the main application:
+
+1. **Sign up/Login** at https://askbiggie.bignoodle.com/auth
+2. **Open Developer Tools** (F12) in your browser
+3. **Go to Console** and run:
+   ```javascript
+   // Get the current session and token
+   const { data: { session } } = await window.supabase.auth.getSession();
+   console.log('Your JWT Token:', session.access_token);
+   ```
+4. **Copy the token** and use it in your API calls
+
+#### Method 2: Programmatic Login (For Applications)
+
+```javascript
+// Using Supabase client in your application
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  'YOUR_SUPABASE_URL', 
+  'YOUR_SUPABASE_ANON_KEY'
+)
+
+// Login with email/password
+const { data, error } = await supabase.auth.signInWithPassword({
+  email: 'your-email@example.com',
+  password: 'your-password'
+})
+
+if (data.session) {
+  const jwtToken = data.session.access_token;
+  console.log('JWT Token:', jwtToken);
+  
+  // Use this token in your API calls
+  const response = await fetch('/api/chat/simple', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${jwtToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      messages: [{ role: 'user', content: 'Hello!' }]
+    })
+  });
+}
+```
+
+#### Method 3: Environment Variables (For Server-Side)
+
+```bash
+# Create a long-lived service account or use your personal token
+ASKBIGGIE_JWT_TOKEN=your_jwt_token_here
+```
+
+```python
+import os
+import requests
+
+token = os.getenv('ASKBIGGIE_JWT_TOKEN')
+response = requests.post(
+    'https://askbiggie-a4fdf63d7e8b.herokuapp.com/api/chat/simple',
+    headers={'Authorization': f'Bearer {token}'},
+    json={'messages': [{'role': 'user', 'content': 'Hello!'}]}
+)
+```
+
+### Authentication Endpoints
+
+**Sign Up:**
+- **Frontend:** https://askbiggie.bignoodle.com/auth?mode=signup
+- **Programmatic:** Use Supabase client `signUp()` method
+
+**Sign In:**
+- **Frontend:** https://askbiggie.bignoodle.com/auth
+- **Programmatic:** Use Supabase client `signInWithPassword()` method
+
+**OAuth Options:**
+- Google OAuth (via frontend)
+- GitHub OAuth (via frontend)
+
+### Token Management
+
+**Token Expiration:**
+- JWT tokens expire after 1 hour (3600 seconds)
+- You'll receive a 401 Unauthorized response when tokens expire
+- Refresh tokens automatically when using Supabase client
+- For manual API calls, you'll need to re-authenticate
+
+**For Supabase Configuration:**
+```javascript
+// These are the public configuration values
+const supabaseUrl = 'https://your-supabase-url'  // Available in frontend env
+const supabaseAnonKey = 'your-anon-key'          // Available in frontend env
+
+// Initialize Supabase client
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
+```
+
+**Quick Test:**
+```bash
+# Test your token (replace YOUR_TOKEN with actual token)
+curl -X GET \
+  https://askbiggie-a4fdf63d7e8b.herokuapp.com/api/chat/models \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+If you get a successful response with available models, your token is working!
 
 ## Endpoints
 
@@ -248,5 +360,52 @@ The agent selector now clearly distinguishes between:
    - Use streaming for better user experience
    - Non-streaming for programmatic integration
    - Handle streaming responses properly
+
+## Step-by-Step Getting Started
+
+### Quick Start (5 minutes)
+
+1. **Get Your Token:**
+   ```javascript
+   // Go to https://askbiggie.bignoodle.com/auth, login, then run in console:
+   const { data: { session } } = await window.supabase.auth.getSession();
+   console.log('Token:', session.access_token);
+   ```
+
+2. **Test the API:**
+   ```bash
+   curl -X POST \
+     https://askbiggie-a4fdf63d7e8b.herokuapp.com/api/chat/quick \
+     -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+     -H "Content-Type: application/json" \
+     -d '{"prompt": "Hello, test message!"}'
+   ```
+
+3. **Start Building:**
+   ```javascript
+   const response = await fetch('/api/chat/simple', {
+     method: 'POST',
+     headers: {
+       'Authorization': 'Bearer YOUR_TOKEN_HERE',
+       'Content-Type': 'application/json'
+     },
+     body: JSON.stringify({
+       messages: [
+         { role: 'user', content: 'What is quantum computing?' }
+       ],
+       stream: false
+     })
+   });
+   
+   const data = await response.json();
+   console.log(data.message.content);
+   ```
+
+### Ready to Scale?
+
+- Use the `/chat/simple` endpoint for full conversation history
+- Enable streaming for better user experience  
+- Integrate with your existing authentication system
+- Monitor usage via the main dashboard
 
 This Simple Chat API provides the perfect balance of simplicity and power for direct AI communication! 
