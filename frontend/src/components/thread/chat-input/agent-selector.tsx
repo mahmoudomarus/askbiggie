@@ -72,10 +72,10 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
   const allAgents = [
     {
       id: undefined,
-              name: 'Biggie',
-      description: 'Your personal AI assistant',
+      name: 'Simple Chat',
+      description: 'Direct AI conversation without tools or complex features - perfect for quick questions and research',
       type: 'default' as const,
-      icon: <Image src="/logo.png" alt="Biggie" width={16} height={16} className="h-4 w-4 dark:invert" />
+      icon: <Image src="/logo.png" alt="Simple Chat" width={16} height={16} className="h-4 w-4 dark:invert" />
     },
     ...PREDEFINED_AGENTS.map(agent => ({
       ...agent,
