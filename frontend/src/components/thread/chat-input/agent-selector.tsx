@@ -72,7 +72,7 @@ export const AgentSelector: React.FC<AgentSelectorProps> = ({
   const allAgents = [
     {
       id: undefined,
-      name: 'Biggie',
+              name: 'Biggie',
       description: 'Your personal AI assistant with full capabilities, tools, and workflows',
       type: 'default' as const,
       icon: <Image src="/logo.png" alt="Biggie" width={16} height={16} className="h-4 w-4 dark:invert" />

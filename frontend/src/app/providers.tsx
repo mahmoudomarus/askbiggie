@@ -43,9 +43,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <ToolCallsContext.Provider value={{ toolCalls, setToolCalls }}>
-        <ReactQueryProvider dehydratedState={dehydratedState}>
-          {children}
-        </ReactQueryProvider>
+          <ReactQueryProvider dehydratedState={dehydratedState}>
+            {children}
+          </ReactQueryProvider>
       </ToolCallsContext.Provider>
     </AuthProvider>
   );

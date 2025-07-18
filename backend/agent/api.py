@@ -875,8 +875,7 @@ async def initiate_agent_with_files(
             thread_result = await db_client.table("threads").insert({
                 "thread_id": thread_id,
                 "account_id": account_id,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "title": prompt[:50] + "..." if len(prompt) > 50 else prompt
+                "created_at": datetime.now(timezone.utc).isoformat()
             }).execute()
             
             # Store user message
