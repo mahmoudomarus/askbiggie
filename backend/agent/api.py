@@ -843,7 +843,68 @@ async def initiate_agent_with_files(
     client = await db.client
     account_id = user_id # In Basejump, personal account_id is the same as user_id
     
-    # Load agent configuration if agent_id is provided
+    # Check if this is Fast Biggie (simple chat mode)
+    if agent_id == 'fast_biggie':
+        # Route to simple chat instead of complex agent system
+        from services.llm import make_llm_api_call
+        
+        # Create a simple response using the chat API logic
+        try:
+            # Get database client
+            db_client = await db.client
+            
+            messages = [{"role": "user", "content": prompt}]
+            
+            # Make direct LLM call without tools or complex processing
+            response = await make_llm_api_call(
+                messages=messages,
+                model_name=model_name,
+                temperature=0.1,
+                stream=False
+            )
+            
+            # Extract content from response
+            content = ""
+            if hasattr(response, 'choices') and len(response.choices) > 0:
+                content = response.choices[0].message.content
+            
+            # Create a simple thread for this conversation
+            thread_id = str(uuid.uuid4())
+            
+            # Store the conversation in the database
+            thread_result = await db_client.table("threads").insert({
+                "thread_id": thread_id,
+                "account_id": account_id,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "title": prompt[:50] + "..." if len(prompt) > 50 else prompt
+            }).execute()
+            
+            # Store user message
+            await db_client.table("messages").insert({
+                "thread_id": thread_id,
+                "type": "user_message", 
+                "content": {"text": prompt},
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }).execute()
+            
+            # Store assistant response
+            await db_client.table("messages").insert({
+                "thread_id": thread_id,
+                "type": "assistant_message",
+                "content": {"text": content},
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }).execute()
+            
+            return InitiateAgentResponse(
+                thread_id=thread_id,
+                message="Fast Biggie conversation started successfully"
+            )
+            
+        except Exception as e:
+            logger.error(f"Fast Biggie error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Fast Biggie failed: {str(e)}")
+    
+    # Load agent configuration if agent_id is provided (for regular agents)
     agent_config = None
     if agent_id:
         agent_result = await client.table('agents').select('*').eq('agent_id', agent_id).eq('account_id', account_id).execute()
