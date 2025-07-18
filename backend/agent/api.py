@@ -843,8 +843,12 @@ async def initiate_agent_with_files(
     client = await db.client
     account_id = user_id # In Basejump, personal account_id is the same as user_id
     
+    # Debug: Log what agent_id we received
+    logger.info(f"🔍 Agent initiation - received agent_id: '{agent_id}' (type: {type(agent_id)})")
+    
     # Check if this is Fast Biggie (simple chat mode)
     if agent_id == 'fast_biggie':
+        logger.info("🚀 Fast Biggie mode detected - routing to simple chat")
         # Route to simple chat instead of complex agent system
         from services.llm import make_llm_api_call
         
