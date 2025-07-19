@@ -54,10 +54,35 @@ export default function ConversationPage({ params }: ConversationPageProps) {
           updated_at: msg.updated_at || new Date().toISOString(),
         }));
 
+      console.log('Fast Biggie: Loaded', unifiedMessages.length, 'messages');
       setMessages(unifiedMessages);
       setIsLoading(false);
     }
   }, [messagesQuery.data, threadId]);
+
+  // Force refresh messages every 2 seconds if we're waiting for a response
+  useEffect(() => {
+    if (isSending) {
+      const interval = setInterval(() => {
+        console.log('Fast Biggie: Polling for new messages...');
+        messagesQuery.refetch();
+      }, 2000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isSending, messagesQuery]);
+
+  // Stop sending state when messages are updated
+  useEffect(() => {
+    if (isSending && messages.length > 0) {
+      // Check if the last message is an assistant response
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage && lastMessage.type === 'assistant') {
+        console.log('Fast Biggie: Assistant response detected, stopping sending state');
+        setIsSending(false);
+      }
+    }
+  }, [messages, isSending]);
 
   // Ensure we reload messages when the page loads
   useEffect(() => {
@@ -88,17 +113,20 @@ export default function ConversationPage({ params }: ConversationPageProps) {
       formData.append('instance', 'single');
 
       const response = await initiateAgent(formData);
+      console.log('Fast Biggie: Response received:', response);
 
-      // Refetch messages to get both user message and AI response
-      await messagesQuery.refetch();
-      scrollToBottom();
+      // Wait a moment for the backend to finish processing, then refetch messages
+      setTimeout(async () => {
+        console.log('Fast Biggie: Refetching messages...');
+        await messagesQuery.refetch();
+        scrollToBottom();
+      }, 1000);
       
-    } catch (error) {
-      console.error('Error sending message:', error);
-      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsSending(false);
-    }
+          } catch (error) {
+        console.error('Fast Biggie Error:', error);
+        alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        setIsSending(false);
+      }
   };
 
   if (isLoading || !threadQuery.data) {
