@@ -813,6 +813,7 @@ async def initiate_agent_with_files(
     stream: Optional[bool] = Form(True),
     enable_context_manager: Optional[bool] = Form(False),
     agent_id: Optional[str] = Form(None),  # Add agent_id parameter
+    thread_id: Optional[str] = Form(None),  # Add thread_id parameter for continuing conversations
     files: List[UploadFile] = File(default=[]),
     is_agent_builder: Optional[bool] = Form(False),
     target_agent_id: Optional[str] = Form(None),
@@ -878,16 +879,21 @@ async def initiate_agent_with_files(
             if hasattr(response, 'choices') and len(response.choices) > 0:
                 content = response.choices[0].message.content
             
-            # Create a simple thread for this conversation
-            thread_id = str(uuid.uuid4())
-            
-            # Store the conversation in the database
-            thread_result = await db_client.table("threads").insert({
-                "thread_id": thread_id,
-                "account_id": account_id,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }).execute()
+            # Use existing thread_id or create a new one
+            if not thread_id:
+                thread_id = str(uuid.uuid4())
+                # Store the new conversation in the database
+                thread_result = await db_client.table("threads").insert({
+                    "thread_id": thread_id,
+                    "account_id": account_id,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }).execute()
+            else:
+                # Update the existing thread's updated_at timestamp
+                thread_result = await db_client.table("threads").update({
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }).eq("thread_id", thread_id).execute()
             
             # Store user message with correct schema
             user_message_id = str(uuid.uuid4())
