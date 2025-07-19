@@ -10,6 +10,7 @@ import { useMessagesQuery } from '@/hooks/react-query/threads/use-messages';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { UnifiedMessage } from '@/app/(dashboard)/projects/[projectId]/thread/_types';
+import { initiateAgent } from '@/lib/api';
 
 interface ConversationPageProps {
   params: Promise<{ threadId: string }>;
@@ -78,23 +79,15 @@ export default function ConversationPage({ params }: ConversationPageProps) {
     setNewMessage('');
 
     try {
-      // Call Fast Biggie directly - this handles everything synchronously
+      // Use the authenticated API function for Fast Biggie
       const formData = new FormData();
       formData.append('prompt', message);
+      formData.append('model_name', 'claude-sonnet-4');
       formData.append('agent_id', 'fast_biggie');
-      formData.append('model_name', 'claude-sonnet-4'); // default model
-      formData.append('instance', 'single');
       formData.append('thread_id', threadId); // continue existing thread
+      formData.append('instance', 'single');
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/agent/initiate`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to get response: ${response.statusText} - ${errorText}`);
-      }
+      const response = await initiateAgent(formData);
 
       // Refetch messages to get both user message and AI response
       await messagesQuery.refetch();
