@@ -885,7 +885,6 @@ async def initiate_agent_with_files(
             thread_result = await db_client.table("threads").insert({
                 "thread_id": thread_id,
                 "account_id": account_id,
-                "name": f"Fast Biggie: {prompt[:50]}{'...' if len(prompt) > 50 else ''}",
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }).execute()
