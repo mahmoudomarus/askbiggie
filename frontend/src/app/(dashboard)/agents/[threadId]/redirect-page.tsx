@@ -14,8 +14,14 @@ export function RedirectPage({ threadId }: RedirectPageProps) {
   const threadQuery = useThreadQuery(threadId);
 
   useEffect(() => {
-    if (threadQuery.data?.project_id) {
-      router.replace(`/projects/${threadQuery.data.project_id}/thread/${threadId}`);
+    if (threadQuery.data) {
+      if (threadQuery.data.project_id) {
+        // Thread has project - redirect to project thread page
+        router.replace(`/projects/${threadQuery.data.project_id}/thread/${threadId}`);
+      } else {
+        // Fast Biggie thread without project - redirect to conversation page
+        router.replace(`/dashboard/conversation/${threadId}`);
+      }
     }
   }, [threadQuery.data, threadId, router]);
 
