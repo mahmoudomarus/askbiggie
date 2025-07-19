@@ -7,8 +7,6 @@ import { ThreadContent } from '@/components/thread/content/ThreadContent';
 import { ChatInput } from '@/components/thread/chat-input/chat-input';
 import { useThreadQuery } from '@/hooks/react-query/threads/use-threads';
 import { useMessagesQuery } from '@/hooks/react-query/threads/use-messages';
-import { useAddUserMessageMutation } from '@/hooks/react-query/threads/use-messages';
-import { useStartAgentMutation } from '@/hooks/react-query/threads/use-agent-run';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { UnifiedMessage } from '@/app/(dashboard)/projects/[projectId]/thread/_types';
@@ -31,8 +29,6 @@ export default function ConversationPage({ params }: ConversationPageProps) {
 
   const threadQuery = useThreadQuery(threadId);
   const messagesQuery = useMessagesQuery(threadId);
-  const addUserMessageMutation = useAddUserMessageMutation();
-  const startAgentMutation = useStartAgentMutation();
 
   useEffect(() => {
     if (threadQuery.data?.project_id) {
@@ -62,6 +58,11 @@ export default function ConversationPage({ params }: ConversationPageProps) {
     }
   }, [messagesQuery.data, threadId]);
 
+  // Ensure we reload messages when the page loads
+  useEffect(() => {
+    messagesQuery.refetch();
+  }, [threadId]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -76,40 +77,32 @@ export default function ConversationPage({ params }: ConversationPageProps) {
     setIsSending(true);
     setNewMessage('');
 
-    const optimisticUserMessage: UnifiedMessage = {
-      message_id: `temp-${Date.now()}`,
-      thread_id: threadId,
-      type: 'user',
-      is_llm_message: false,
-      content: message,
-      metadata: '{}',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    setMessages(prev => [...prev, optimisticUserMessage]);
-    scrollToBottom();
-
     try {
-      // Add user message to database
-      await addUserMessageMutation.mutateAsync({
-        threadId,
-        message
+      // Call Fast Biggie directly - this handles everything synchronously
+      const formData = new FormData();
+      formData.append('prompt', message);
+      formData.append('agent_id', 'fast_biggie');
+      formData.append('model_name', 'claude-sonnet-4'); // default model
+      formData.append('instance', 'single');
+      formData.append('thread_id', threadId); // continue existing thread
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/agent/initiate`, {
+        method: 'POST',
+        body: formData,
       });
 
-      // Start agent to get response
-      await startAgentMutation.mutateAsync({
-        threadId,
-        options: { agent_id: 'fast_biggie' }
-      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to get response: ${response.statusText} - ${errorText}`);
+      }
 
-      // Refetch messages to get the agent response
-      messagesQuery.refetch();
+      // Refetch messages to get both user message and AI response
+      await messagesQuery.refetch();
+      scrollToBottom();
       
     } catch (error) {
       console.error('Error sending message:', error);
-      // Remove optimistic message on error
-      setMessages(prev => prev.filter(m => m.message_id !== optimisticUserMessage.message_id));
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSending(false);
     }
