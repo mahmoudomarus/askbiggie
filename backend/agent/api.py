@@ -882,6 +882,7 @@ async def initiate_agent_with_files(
             # Use existing thread_id or create a new one
             if not thread_id:
                 thread_id = str(uuid.uuid4())
+                logger.info(f"🧵 Fast Biggie: Creating new thread {thread_id}")
                 # Store the new conversation in the database
                 thread_result = await db_client.table("threads").insert({
                     "thread_id": thread_id,
@@ -889,15 +890,19 @@ async def initiate_agent_with_files(
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }).execute()
+                logger.info(f"✅ Fast Biggie: Thread created successfully: {thread_result}")
             else:
+                logger.info(f"🔄 Fast Biggie: Updating existing thread {thread_id}")
                 # Update the existing thread's updated_at timestamp
                 thread_result = await db_client.table("threads").update({
                     "updated_at": datetime.now(timezone.utc).isoformat()
                 }).eq("thread_id", thread_id).execute()
+                logger.info(f"✅ Fast Biggie: Thread updated successfully: {thread_result}")
             
             # Store user message with correct schema
             user_message_id = str(uuid.uuid4())
-            await db_client.table("messages").insert({
+            logger.info(f"💬 Fast Biggie: Storing user message {user_message_id}")
+            user_result = await db_client.table("messages").insert({
                 "message_id": user_message_id,
                 "thread_id": thread_id,
                 "type": "user", 
@@ -907,10 +912,12 @@ async def initiate_agent_with_files(
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }).execute()
+            logger.info(f"✅ Fast Biggie: User message stored: {user_result}")
             
             # Store assistant response with correct schema
             assistant_message_id = str(uuid.uuid4())
-            await db_client.table("messages").insert({
+            logger.info(f"🤖 Fast Biggie: Storing assistant message {assistant_message_id}")
+            assistant_result = await db_client.table("messages").insert({
                 "message_id": assistant_message_id,
                 "thread_id": thread_id,
                 "type": "assistant",
@@ -920,6 +927,9 @@ async def initiate_agent_with_files(
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }).execute()
+            logger.info(f"✅ Fast Biggie: Assistant message stored: {assistant_result}")
+            
+            logger.info(f"🎉 Fast Biggie: Conversation completed successfully for thread {thread_id}")
             
             return InitiateAgentResponse(
                 thread_id=thread_id,
