@@ -20,7 +20,7 @@ export function RedirectPage({ threadId }: RedirectPageProps) {
         router.replace(`/projects/${threadQuery.data.project_id}/thread/${threadId}`);
       } else {
         // Fast Biggie thread without project - redirect to conversation page
-        router.replace(`/dashboard/conversation/${threadId}`);
+        router.replace(`/conversation/${threadId}`);
       }
     }
   }, [threadQuery.data, threadId, router]);
