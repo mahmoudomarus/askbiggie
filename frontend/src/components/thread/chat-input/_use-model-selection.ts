@@ -50,6 +50,12 @@ export const MODELS = {
     recommended: false,
     lowQuality: false
   },
+  'kimi-k2': { 
+    tier: 'free', 
+    priority: 65,
+    recommended: false,
+    lowQuality: false
+  },
 
   // Premium/Paid tier models (require subscription)
   'sonnet-3.7': { 

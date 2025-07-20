@@ -76,6 +76,7 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         "anthropic/claude-3-7-sonnet-latest": "openrouter/anthropic/claude-3.7-sonnet",
         "anthropic/claude-sonnet-4-20250514": "openrouter/anthropic/claude-sonnet-4",
         "xai/grok-4": "openrouter/x-ai/grok-4",
+        "moonshotai/kimi-k2": "openrouter/moonshotai/kimi-k2",
     }
     
     # Check for exact match first
@@ -92,6 +93,8 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         return "openrouter/anthropic/claude-sonnet-4"
     elif "xai" in model_name.lower() or "grok" in model_name.lower():
         return "openrouter/x-ai/grok-4"
+    elif "kimi" in model_name.lower() or "moonshot" in model_name.lower():
+        return "openrouter/moonshotai/kimi-k2"
     
     return None
 
