@@ -76,6 +76,7 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         "anthropic/claude-3-7-sonnet-latest": "openrouter/anthropic/claude-3.7-sonnet",
         "anthropic/claude-sonnet-4-20250514": "openrouter/anthropic/claude-sonnet-4",
         "xai/grok-4": "openrouter/x-ai/grok-4",
+        "kimi-k2": "openrouter/moonshotai/kimi-k2",
         "moonshotai/kimi-k2": "openrouter/moonshotai/kimi-k2",
     }
     

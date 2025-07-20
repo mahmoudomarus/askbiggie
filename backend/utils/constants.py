@@ -103,7 +103,7 @@ MODELS = {
         "tier_availability": ["paid"]
     },
     
-    "moonshotai/kimi-k2": {
+    "openrouter/moonshotai/kimi-k2": {
         "aliases": ["kimi-k2", "kimi", "moonshot-kimi-k2"],
         "pricing": {
             "input_cost_per_million_tokens": 0.25,
@@ -158,11 +158,10 @@ def _generate_model_structures():
             # Also add pricing for the short alias
             for alias in config["aliases"]:
                 pricing[alias] = config["pricing"]
-        elif model_name.startswith("moonshotai/"):
+        elif model_name.startswith("openrouter/moonshotai/"):
             # Add pricing for moonshot models
-            pricing[model_name] = config["pricing"]
-            # Also add pricing for openrouter prefixed version
-            pricing[f"openrouter/{model_name}"] = config["pricing"]
+            legacy_name = model_name.replace("openrouter/", "")
+            pricing[legacy_name] = config["pricing"]
             # Add pricing for aliases
             for alias in config["aliases"]:
                 pricing[alias] = config["pricing"]
