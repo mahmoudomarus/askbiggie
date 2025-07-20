@@ -6,6 +6,9 @@ from uuid import uuid4
 from agentpress.tool import ToolResult, openapi_schema, xml_schema
 from sandbox.tool_base import SandboxToolsBase
 from agentpress.thread_manager import ThreadManager
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SandboxShellTool(SandboxToolsBase):
     """Tool for executing tasks in a Daytona sandbox with browser-use capabilities. 
@@ -118,8 +121,11 @@ class SandboxShellTool(SandboxToolsBase):
         timeout: int = 60
     ) -> ToolResult:
         try:
-            # Ensure sandbox is initialized
-            await self._ensure_sandbox()
+            # Ensure sandbox is initialized with detailed error reporting
+            try:
+                await self._ensure_sandbox()
+            except Exception as sandbox_error:
+                return self.fail_response(f"Sandbox connection failed: {str(sandbox_error)}. Please try restarting the conversation or report this technical issue.")
             
             # Set up working directory
             cwd = self.workspace_path
@@ -131,17 +137,24 @@ class SandboxShellTool(SandboxToolsBase):
             if not session_name:
                 session_name = f"session_{str(uuid4())[:8]}"
             
-            # Check if tmux session already exists
-            check_session = await self._execute_raw_command(f"tmux has-session -t {session_name} 2>/dev/null || echo 'not_exists'")
-            session_exists = "not_exists" not in check_session.get("output", "")
+            # Check if tmux session already exists with better error handling
+            try:
+                check_session = await self._execute_raw_command(f"tmux has-session -t {session_name} 2>/dev/null || echo 'not_exists'")
+                session_exists = "not_exists" not in check_session.get("output", "")
+            except Exception as session_check_error:
+                logger.warning(f"Failed to check tmux session status: {str(session_check_error)}")
+                session_exists = False
             
             if not session_exists:
-                # Create a new tmux session
-                await self._execute_raw_command(f"tmux new-session -d -s {session_name}")
+                # Create a new tmux session with error handling
+                try:
+                    await self._execute_raw_command(f"tmux new-session -d -s {session_name}")
+                except Exception as session_create_error:
+                    return self.fail_response(f"Failed to create tmux session: {str(session_create_error)}. The sandbox may be experiencing issues.")
                 
             # Ensure we're in the correct directory and send command to tmux
             full_command = f"cd {cwd} && {command}"
-            wrapped_command = full_command.replace('"', '\\"')  # Escape double quotes
+            wrapped_command = full_command.replace('"', '\\"')
             
             if blocking:
                 # For blocking execution, use a more reliable approach
@@ -150,8 +163,16 @@ class SandboxShellTool(SandboxToolsBase):
                 completion_command = f"{command} ; echo {marker}"
                 wrapped_completion_command = completion_command.replace('"', '\\"')
                 
-                # Send the command with completion marker
-                await self._execute_raw_command(f'tmux send-keys -t {session_name} "cd {cwd} && {wrapped_completion_command}" Enter')
+                try:
+                    # Send the command with completion marker
+                    await self._execute_raw_command(f'tmux send-keys -t {session_name} "cd {cwd} && {wrapped_completion_command}" Enter')
+                except Exception as command_send_error:
+                    # Clean up session and report error
+                    try:
+                        await self._execute_raw_command(f"tmux kill-session -t {session_name}")
+                    except:
+                        pass
+                    return self.fail_response(f"Failed to send command to session: {str(command_send_error)}. Command: {command}")
                 
                 start_time = time.time()
                 final_output = ""
@@ -160,26 +181,37 @@ class SandboxShellTool(SandboxToolsBase):
                     # Wait a shorter interval for more responsive checking
                     await asyncio.sleep(0.5)
                     
-                    # Check if session still exists (command might have exited)
-                    check_result = await self._execute_raw_command(f"tmux has-session -t {session_name} 2>/dev/null || echo 'ended'")
-                    if "ended" in check_result.get("output", ""):
-                        break
+                    try:
+                        # Check if session still exists (command might have exited)
+                        check_result = await self._execute_raw_command(f"tmux has-session -t {session_name} 2>/dev/null || echo 'ended'")
+                        if "ended" in check_result.get("output", ""):
+                            break
+                            
+                        # Get current output and check for our completion marker
+                        output_result = await self._execute_raw_command(f"tmux capture-pane -t {session_name} -p -S - -E -")
+                        current_output = output_result.get("output", "")
                         
-                    # Get current output and check for our completion marker
-                    output_result = await self._execute_raw_command(f"tmux capture-pane -t {session_name} -p -S - -E -")
-                    current_output = output_result.get("output", "")
-                    
-                    if marker in current_output:
-                        final_output = current_output
-                        break
+                        if marker in current_output:
+                            final_output = current_output
+                            break
+                    except Exception as monitor_error:
+                        logger.warning(f"Error monitoring command execution: {str(monitor_error)}")
+                        # Continue trying but log the issue
+                        continue
                 
                 # If we didn't get the marker, capture whatever output we have
                 if not final_output:
-                    output_result = await self._execute_raw_command(f"tmux capture-pane -t {session_name} -p -S - -E -")
-                    final_output = output_result.get("output", "")
+                    try:
+                        output_result = await self._execute_raw_command(f"tmux capture-pane -t {session_name} -p -S - -E -")
+                        final_output = output_result.get("output", "")
+                    except Exception as capture_error:
+                        final_output = f"Failed to capture command output: {str(capture_error)}"
                 
                 # Kill the session after capture
-                await self._execute_raw_command(f"tmux kill-session -t {session_name}")
+                try:
+                    await self._execute_raw_command(f"tmux kill-session -t {session_name}")
+                except Exception as cleanup_error:
+                    logger.warning(f"Failed to clean up session {session_name}: {str(cleanup_error)}")
                 
                 return self.success_response({
                     "output": final_output,
@@ -189,7 +221,10 @@ class SandboxShellTool(SandboxToolsBase):
                 })
             else:
                 # Send command to tmux session for non-blocking execution
-                await self._execute_raw_command(f'tmux send-keys -t {session_name} "{wrapped_command}" Enter')
+                try:
+                    await self._execute_raw_command(f'tmux send-keys -t {session_name} "{wrapped_command}" Enter')
+                except Exception as command_send_error:
+                    return self.fail_response(f"Failed to send non-blocking command: {str(command_send_error)}. Command: {command}")
                 
                 # For non-blocking, just return immediately
                 return self.success_response({
@@ -200,13 +235,18 @@ class SandboxShellTool(SandboxToolsBase):
                 })
                 
         except Exception as e:
+            # Enhanced error reporting with context
+            error_context = f"Command: {command}, Session: {session_name}, Working Dir: {cwd if 'cwd' in locals() else 'unknown'}"
+            logger.error(f"Error in execute_command: {str(e)}. Context: {error_context}")
+            
             # Attempt to clean up session in case of error
             if session_name:
                 try:
                     await self._execute_raw_command(f"tmux kill-session -t {session_name}")
                 except:
                     pass
-            return self.fail_response(f"Error executing command: {str(e)}")
+            
+            return self.fail_response(f"Command execution failed: {str(e)}. This may indicate a sandbox connectivity issue. Try a simpler command first or restart the conversation.")
 
     async def _execute_raw_command(self, command: str) -> Dict[str, Any]:
         """Execute a raw command directly in the sandbox."""

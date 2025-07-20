@@ -122,42 +122,58 @@ class SandboxFilesTool(SandboxToolsBase):
     )
     async def create_file(self, file_path: str, file_contents: str, permissions: str = "644") -> ToolResult:
         try:
-            # Ensure sandbox is initialized
-            await self._ensure_sandbox()
+            # Ensure sandbox is initialized with clear error reporting
+            try:
+                await self._ensure_sandbox()
+            except Exception as sandbox_error:
+                return self.fail_response(f"Sandbox connection failed: {str(sandbox_error)}. Cannot create files without sandbox access. Please restart the conversation or report this technical issue.")
             
             file_path = self.clean_path(file_path)
             full_path = f"{self.workspace_path}/{file_path}"
+            
+            # Check if file already exists
             if await self._file_exists(full_path):
-                return self.fail_response(f"File '{file_path}' already exists. Use update_file to modify existing files.")
+                return self.fail_response(f"File '{file_path}' already exists. Use str_replace or full_file_rewrite to modify existing files.")
             
             # Create parent directories if needed
             parent_dir = '/'.join(full_path.split('/')[:-1])
             if parent_dir:
-                await self.sandbox.fs.create_folder(parent_dir, "755")
+                try:
+                    await self.sandbox.fs.create_folder(parent_dir, "755")
+                except Exception as dir_error:
+                    return self.fail_response(f"Failed to create directory structure for '{file_path}': {str(dir_error)}")
             
             # convert to json string if file_contents is a dict
             if isinstance(file_contents, dict):
                 file_contents = json.dumps(file_contents, indent=4)
             
-            # Write the file content
-            await self.sandbox.fs.upload_file(file_contents.encode(), full_path)
-            await self.sandbox.fs.set_file_permissions(full_path, permissions)
+            # Write the file content with error handling
+            try:
+                await self.sandbox.fs.upload_file(file_contents.encode(), full_path)
+                await self.sandbox.fs.set_file_permissions(full_path, permissions)
+            except Exception as file_error:
+                return self.fail_response(f"Failed to create file '{file_path}': {str(file_error)}. This may indicate a sandbox file system issue.")
             
-            message = f"File '{file_path}' created successfully."
+            message = f"✅ File '{file_path}' created successfully."
             
-            # Check if index.html was created and add 8080 server info (only in root workspace)
+            # Special handling for index.html files - provide prominent website URL
             if file_path.lower() == 'index.html':
                 try:
                     website_link = await self.sandbox.get_preview_link(8080)
                     website_url = website_link.url if hasattr(website_link, 'url') else str(website_link).split("url='")[1].split("'")[0]
-                    message += f"\n\n[Auto-detected index.html - HTTP server available at: {website_url}]"
-                    message += "\n[Note: Use the provided HTTP server URL above instead of starting a new server]"
-                except Exception as e:
-                    logger.warning(f"Failed to get website URL for index.html: {str(e)}")
+                    message += f"\n\n🌐 **WEBSITE READY!** Your HTML page is live at:\n🔗 {website_url}\n\n📋 The website is automatically served from the /workspace directory on port 8080."
+                    message += "\n💡 You can view your website immediately using the URL above - no additional server setup needed!"
+                except Exception as url_error:
+                    logger.warning(f"Failed to get website URL for index.html: {str(url_error)}")
+                    message += f"\n\n⚠️ File created but could not generate preview URL: {str(url_error)}"
             
             return self.success_response(message)
+            
         except Exception as e:
-            return self.fail_response(f"Error creating file: {str(e)}")
+            # Enhanced error reporting for debugging
+            error_details = f"Error creating file '{file_path}': {str(e)}"
+            logger.error(error_details)
+            return self.fail_response(f"{error_details}. This indicates a technical issue with the sandbox file system.")
 
     @openapi_schema({
         "type": "function",
