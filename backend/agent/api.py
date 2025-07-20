@@ -899,7 +899,7 @@ async def initiate_agent_with_files(
                 }).eq("thread_id", thread_id).execute()
                 logger.info(f"✅ Fast Biggie: Thread updated successfully: {thread_result}")
             
-            # Store user message with correct schema
+            # Store user message with correct schema (JSON format for consistency)
             user_message_id = str(uuid.uuid4())
             logger.info(f"💬 Fast Biggie: Storing user message {user_message_id}")
             user_result = await db_client.table("messages").insert({
@@ -907,14 +907,14 @@ async def initiate_agent_with_files(
                 "thread_id": thread_id,
                 "type": "user", 
                 "is_llm_message": False,
-                "content": prompt,  # Store as text directly, not as object
+                "content": json.dumps({"content": prompt}),  # Store as JSON object for consistency
                 "metadata": "{}",
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat()
             }).execute()
             logger.info(f"✅ Fast Biggie: User message stored: {user_result}")
             
-            # Store assistant response with correct schema
+            # Store assistant response with correct schema (JSON format for ThreadContent compatibility)
             assistant_message_id = str(uuid.uuid4())
             logger.info(f"🤖 Fast Biggie: Storing assistant message {assistant_message_id}")
             assistant_result = await db_client.table("messages").insert({
@@ -922,7 +922,7 @@ async def initiate_agent_with_files(
                 "thread_id": thread_id,
                 "type": "assistant",
                 "is_llm_message": True,
-                "content": content,  # Store as text directly, not as object
+                "content": json.dumps({"content": content}),  # Store as JSON object for ThreadContent compatibility
                 "metadata": "{}",
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "updated_at": datetime.now(timezone.utc).isoformat()
