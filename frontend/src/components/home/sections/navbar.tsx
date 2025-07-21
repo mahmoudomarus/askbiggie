@@ -117,7 +117,7 @@ export function Navbar() {
           <div className="flex h-[56px] items-center justify-between p-4">
             <Link href="/" className="flex items-center gap-3">
               <Image
-                src="/logo.png"
+                src="https://bignoodle.com/askbiggie/bignoodle_header_logo.png"
                 alt="Bignoodle AI Logo"
                 width={80}
                 height={16}
@@ -179,7 +179,7 @@ export function Navbar() {
                 <div className="flex items-center justify-between">
                   <Link href="/" className="flex items-center gap-3">
                     <Image
-                      src="/logo.png"
+                      src="https://bignoodle.com/askbiggie/bignoodle_header_logo.png"
                       alt="Bignoodle AI Logo"
                       width={70}
                       height={14}

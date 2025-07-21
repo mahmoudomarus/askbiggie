@@ -16,7 +16,7 @@ export function FooterSection() {
         <div className="flex flex-col items-start justify-start gap-y-5 max-w-xs mx-0">
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/logo.png"
+              src="https://bignoodle.com/askbiggie/bignoodle_header_logo.png"
               alt="Bignoodle AI Logo"
               width={70}
               height={14}

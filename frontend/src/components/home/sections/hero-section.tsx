@@ -298,13 +298,16 @@ export function HeroSection() {
             </span>
           </Link> */}
           <div className="flex flex-col items-center justify-center gap-5 pt-16">
-            <h1 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-medium tracking-tighter text-balance text-center">
-              <span style={{ color: '#FF4A12' }}>Biggie</span>
-              <span className="text-primary">, your AI Employee.</span>
-            </h1>
-            <p className="text-base md:text-lg text-center text-muted-foreground font-medium text-balance leading-relaxed tracking-tight">
-              {hero.description}
-            </p>
+            <img 
+              src="https://bignoodle.com/askbiggie/askbiggie_title.png" 
+              className="responsive"
+              alt="Ask Biggie - Your AI Employee"
+              style={{
+                width: '100%',
+                maxWidth: '1170px',
+                height: 'auto'
+              }}
+            />
           </div>
 
           <div className="flex items-center w-full max-w-4xl gap-2 flex-wrap justify-center">
