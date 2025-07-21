@@ -631,15 +631,6 @@ export const startAgent = async (
   },
 ): Promise<{ agent_run_id: string }> => {
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
-      throw new NoAccessTokenAvailableError();
-    }
-
     // Check if backend URL is configured
     if (!API_URL) {
       throw new Error(
@@ -673,42 +664,12 @@ export const startAgent = async (
       body.agent_id = finalOptions.agent_id;
     }
 
-    const response = await fetch(`${API_URL}/thread/${threadId}/agent/start`, {
+    const response = await makeAuthenticatedRequest(`${API_URL}/thread/${threadId}/agent/start`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
       body: JSON.stringify(body),
     });
 
     if (!response.ok) {
-      // Check for 402 Payment Required first
-      if (response.status === 402) {
-        try {
-          const errorData = await response.json();
-          console.error(`[API] Billing error starting agent (402):`, errorData);
-          // Ensure detail exists and has a message property
-          const detail = errorData?.detail || { message: 'Payment Required' };
-          if (typeof detail.message !== 'string') {
-            detail.message = 'Payment Required'; // Default message if missing
-          }
-          throw new BillingError(response.status, detail);
-        } catch (parseError) {
-          // Handle cases where parsing fails or the structure isn't as expected
-          console.error(
-            '[API] Could not parse 402 error response body:',
-            parseError,
-          );
-          throw new BillingError(
-            response.status,
-            { message: 'Payment Required' },
-            `Error starting agent: ${response.statusText} (402)`,
-          );
-        }
-      }
-
-      // Handle other errors
       const errorText = await response
         .text()
         .catch(() => 'No error details available');
@@ -724,30 +685,7 @@ export const startAgent = async (
     const result = await response.json();
     return result;
   } catch (error) {
-    // Rethrow BillingError instances directly
-    if (error instanceof BillingError) {
-      throw error;
-    }
-
-    if (error instanceof NoAccessTokenAvailableError) {
-      throw error;
-    }
-
     console.error('[API] Failed to start agent:', error);
-    
-    // Handle different error types with appropriate user messages
-    if (
-      error instanceof TypeError &&
-      error.message.includes('Failed to fetch')
-    ) {
-      const networkError = new Error(
-        `Cannot connect to backend server. Please check your internet connection and make sure the backend is running.`,
-      );
-      handleApiError(networkError, { operation: 'start agent', resource: 'AI assistant' });
-      throw networkError;
-    }
-
-    // For other errors, add context and rethrow
     handleApiError(error, { operation: 'start agent', resource: 'AI assistant' });
     throw error;
   }
@@ -807,23 +745,10 @@ export const getAgentStatus = async (agentRunId: string): Promise<AgentRun> => {
   }
 
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
-      console.error('[API] No access token available for getAgentStatus');
-      throw new NoAccessTokenAvailableError();
-    }
-
     const url = `${API_URL}/agent-run/${agentRunId}`;
     console.log(`[API] Fetching from: ${url}`);
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
+    const response = await makeAuthenticatedRequest(url, {
       // Add cache: 'no-store' to prevent caching
       cache: 'no-store',
     });
@@ -974,16 +899,31 @@ export const streamAgent = (
       }
 
       const supabase = createClient();
-      const {
+      let {
         data: { session },
       } = await supabase.auth.getSession();
 
+      // Try to refresh session if not available
       if (!session?.access_token) {
-        const authError = new NoAccessTokenAvailableError();
-        console.error('[STREAM] No auth token available');
-        callbacks.onError(authError);
-        callbacks.onClose();
-        return;
+        try {
+          console.log('[STREAM] No session, attempting to refresh...');
+          const { data: refreshData, error } = await supabase.auth.refreshSession();
+          if (error || !refreshData.session?.access_token) {
+            const authError = new NoAccessTokenAvailableError();
+            console.error('[STREAM] No auth token available after refresh');
+            callbacks.onError(authError);
+            callbacks.onClose();
+            return;
+          }
+          // Update session with refreshed data
+          session = refreshData.session;
+        } catch (error) {
+          const authError = new NoAccessTokenAvailableError();
+          console.error('[STREAM] Error refreshing session:', error);
+          callbacks.onError(authError);
+          callbacks.onClose();
+          return;
+        }
       }
 
       const url = new URL(`${API_URL}/agent-run/${agentRunId}/stream`);
@@ -1497,15 +1437,6 @@ export const initiateAgent = async (
   formData: FormData,
 ): Promise<InitiateAgentResponse> => {
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
-      throw new NoAccessTokenAvailableError();
-    }
-
     if (!API_URL) {
       throw new Error(
         'Backend URL is not configured. Set NEXT_PUBLIC_BACKEND_URL in your environment.',
@@ -1516,11 +1447,8 @@ export const initiateAgent = async (
       `[API] Initiating agent with files using ${API_URL}/agent/initiate`,
     );
 
-    const response = await fetch(`${API_URL}/agent/initiate`, {
+    const response = await makeAuthenticatedRequest(`${API_URL}/agent/initiate`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
       body: formData,
       cache: 'no-store',
     });
@@ -1697,24 +1625,10 @@ export const createCheckoutSession = async (
   request: CreateCheckoutSessionRequest,
 ): Promise<CreateCheckoutSessionResponse> => {
   try {
-    const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session?.access_token) {
-      throw new NoAccessTokenAvailableError();
-    }
-    
-    
     const requestBody = { ...request };
     
-    const response = await fetch(`${API_URL}/billing/create-checkout-session`, {
+    const response = await makeAuthenticatedRequest(`${API_URL}/billing/create-checkout-session`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
       body: JSON.stringify(requestBody),
     });
 
@@ -2012,4 +1926,64 @@ export const getAgentBuilderChatHistory = async (agentId: string): Promise<{mess
   console.log('[API] Agent builder chat history fetched:', data);
 
   return data;
+};
+
+// Helper function to get fresh auth headers with automatic retry
+const getAuthHeaders = async (retryCount = 0): Promise<Record<string, string>> => {
+  const supabase = createClient();
+  let { data: { session } } = await supabase.auth.getSession();
+
+  // If no session and this is first try, attempt to refresh
+  if (!session && retryCount === 0) {
+    console.log('[API] No session found, attempting to refresh...');
+    const { data: refreshData, error } = await supabase.auth.refreshSession();
+    if (!error && refreshData.session) {
+      session = refreshData.session;
+      console.log('[API] Session refreshed successfully');
+    } else {
+      console.error('[API] Failed to refresh session:', error);
+    }
+  }
+
+  if (!session?.access_token) {
+    throw new NoAccessTokenAvailableError();
+  }
+
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${session.access_token}`,
+  };
+};
+
+// Helper function to make authenticated requests with retry logic
+const makeAuthenticatedRequest = async (
+  url: string,
+  options: RequestInit = {},
+  retryCount = 0
+): Promise<Response> => {
+  try {
+    const headers = await getAuthHeaders(retryCount);
+    
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...headers,
+        ...options.headers,
+      },
+    });
+
+    // If we get a 401 and haven't retried yet, try refreshing session
+    if (response.status === 401 && retryCount === 0) {
+      console.log('[API] Got 401, attempting to refresh session and retry...');
+      return makeAuthenticatedRequest(url, options, retryCount + 1);
+    }
+
+    return response;
+  } catch (error) {
+    if (error instanceof NoAccessTokenAvailableError && retryCount === 0) {
+      console.log('[API] No access token, attempting to refresh and retry...');
+      return makeAuthenticatedRequest(url, options, retryCount + 1);
+    }
+    throw error;
+  }
 };
