@@ -44,9 +44,9 @@ export const MODELS = {
     recommended: false,
     lowQuality: false
   },
-  'qwen3': { 
-    tier: 'free', 
-    priority: 60,
+  'qwen3-235b': { 
+    tier: 'premium', 
+    priority: 85,
     recommended: false,
     lowQuality: false
   },

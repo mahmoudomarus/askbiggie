@@ -111,6 +111,14 @@ MODELS = {
         },
         "tier_availability": ["free", "paid"]
     },
+    "openrouter/qwen/qwen3-235b-a22b-07-25": {
+        "aliases": ["qwen3-235b", "qwen-3", "qwen3"],
+        "pricing": {
+            "input_cost_per_million_tokens": 3.50,
+            "output_cost_per_million_tokens": 15.00
+        },
+        "tier_availability": ["paid"]
+    },
     
 }
 

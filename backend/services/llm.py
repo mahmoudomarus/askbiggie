@@ -78,6 +78,10 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         "xai/grok-4": "openrouter/x-ai/grok-4",
         "kimi-k2": "openrouter/moonshotai/kimi-k2",
         "moonshotai/kimi-k2": "openrouter/moonshotai/kimi-k2",
+        "qwen3-235b": "openrouter/qwen/qwen3-235b-a22b-07-25",
+        "qwen-3": "openrouter/qwen/qwen3-235b-a22b-07-25",
+        "qwen3": "openrouter/qwen/qwen3-235b-a22b-07-25",
+        "qwen/qwen3-235b-a22b-07-25": "openrouter/qwen/qwen3-235b-a22b-07-25",
     }
     
     # Check for exact match first
