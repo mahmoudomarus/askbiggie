@@ -1964,6 +1964,29 @@ const makeAuthenticatedRequest = async (
   try {
     const headers = await getAuthHeaders(retryCount);
     
+    // Special logging for FormData requests to debug prompt field issues
+    if (options.body instanceof FormData) {
+      console.log('[API] FormData request detected, logging contents:');
+      const formDataEntries = Array.from(options.body.entries());
+      formDataEntries.forEach(([key, value]) => {
+        if (value instanceof File) {
+          console.log(`[API] FormData entry: ${key} = File(${value.name}, ${value.size} bytes)`);
+        } else {
+          console.log(`[API] FormData entry: ${key} = "${value}"`);
+        }
+      });
+      
+      // Check for prompt field specifically
+      const promptEntry = formDataEntries.find(([key]) => key === 'prompt');
+      if (!promptEntry) {
+        console.error('[API] CRITICAL: No prompt field found in FormData!');
+      } else if (!promptEntry[1] || (typeof promptEntry[1] === 'string' && !promptEntry[1].trim())) {
+        console.error('[API] CRITICAL: Prompt field is empty or whitespace-only:', promptEntry[1]);
+      } else {
+        console.log('[API] Prompt field verified:', promptEntry[1]);
+      }
+    }
+    
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -1976,6 +1999,22 @@ const makeAuthenticatedRequest = async (
     if (response.status === 401 && retryCount === 0) {
       console.log('[API] Got 401, attempting to refresh session and retry...');
       return makeAuthenticatedRequest(url, options, retryCount + 1);
+    }
+
+    // Enhanced error logging for 422 errors (validation errors)
+    if (response.status === 422) {
+      try {
+        const errorText = await response.text();
+        console.error('[API] 422 Validation Error Details:', errorText);
+        // Re-create response for further processing since we consumed the body
+        return new Response(errorText, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers
+        });
+      } catch (err) {
+        console.error('[API] Failed to parse 422 error response:', err);
+      }
     }
 
     return response;
