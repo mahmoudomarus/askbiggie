@@ -35,11 +35,13 @@ def initialize():
         parsed_url = urlparse(redis_url)
         use_ssl = parsed_url.scheme == 'rediss'
         
-        # Connection pool configuration
-        max_connections = 128
-        socket_timeout = 15.0
-        connect_timeout = 10.0
-        retry_on_timeout = not (os.getenv("REDIS_RETRY_ON_TIMEOUT", "True").lower() != "true")
+        # Connection pool configuration - FIXED for Redis Premium 0 (40 connection limit)
+        # With 1 web + 1 worker dyno, allocate 15 connections per dyno with 10 connection buffer
+        max_connections = int(os.getenv("REDIS_MAX_CONNECTIONS", "15"))
+        socket_timeout = 10.0  # Reduced from 15s for faster failover
+        connect_timeout = 5.0   # Reduced from 10s for faster failover
+        retry_on_timeout = True
+        retry_on_error = [redis.ConnectionError, redis.TimeoutError]
         
         # SSL configuration for secure connections
         ssl_config = None
@@ -50,15 +52,18 @@ def initialize():
         
         logger.info(f"Initializing Redis connection pool from URL with SSL: {use_ssl}, max {max_connections} connections")
         
-        # Create connection pool from URL
+        # Create connection pool from URL with optimized settings
         pool = redis.ConnectionPool.from_url(
             redis_url,
             decode_responses=True,
             socket_timeout=socket_timeout,
             socket_connect_timeout=connect_timeout,
             socket_keepalive=True,
+            socket_keepalive_options={},
             retry_on_timeout=retry_on_timeout,
-            health_check_interval=30,
+            retry_on_error=retry_on_error,
+            retry=redis.Retry(redis.ExponentialBackoff(), 3),
+            health_check_interval=15,  # More frequent health checks
             max_connections=max_connections,
             ssl_cert_reqs=None if use_ssl else None,
             ssl_ca_certs=None if use_ssl else None,
@@ -71,11 +76,12 @@ def initialize():
         redis_password = os.getenv("REDIS_PASSWORD", "")
         use_ssl = os.getenv("REDIS_SSL", "false").lower() == "true"
         
-        # Connection pool configuration - optimized for production
-        max_connections = 128
-        socket_timeout = 15.0
-        connect_timeout = 10.0
-        retry_on_timeout = not (os.getenv("REDIS_RETRY_ON_TIMEOUT", "True").lower() != "true")
+        # Connection pool configuration - optimized for connection limits
+        max_connections = int(os.getenv("REDIS_MAX_CONNECTIONS", "15"))
+        socket_timeout = 10.0
+        connect_timeout = 5.0
+        retry_on_timeout = True
+        retry_on_error = [redis.ConnectionError, redis.TimeoutError]
 
         logger.info(f"Initializing Redis connection pool to {redis_host}:{redis_port} with SSL: {use_ssl}, max {max_connections} connections")
 
@@ -95,8 +101,11 @@ def initialize():
             socket_timeout=socket_timeout,
             socket_connect_timeout=connect_timeout,
             socket_keepalive=True,
+            socket_keepalive_options={},
             retry_on_timeout=retry_on_timeout,
-            health_check_interval=30,
+            retry_on_error=retry_on_error,
+            retry=redis.Retry(redis.ExponentialBackoff(), 3),
+            health_check_interval=15,
             max_connections=max_connections,
             ssl=use_ssl,
             ssl_cert_reqs=None if use_ssl else None,
@@ -120,8 +129,8 @@ async def initialize_async():
             initialize()
 
         try:
-            # Test connection with timeout
-            await asyncio.wait_for(client.ping(), timeout=5.0)
+            # Test connection with shorter timeout for faster failover
+            await asyncio.wait_for(client.ping(), timeout=3.0)
             logger.info("Successfully connected to Redis")
             _initialized = True
         except asyncio.TimeoutError:
@@ -129,6 +138,16 @@ async def initialize_async():
             client = None
             _initialized = False
             raise ConnectionError("Redis connection timeout")
+        except redis.ConnectionError as e:
+            logger.error(f"Redis connection error: {e}")
+            client = None
+            _initialized = False
+            raise ConnectionError(f"Redis connection failed: {e}")
+        except redis.AuthenticationError as e:
+            logger.error(f"Redis authentication error: {e}")
+            client = None
+            _initialized = False
+            raise ConnectionError(f"Redis authentication failed: {e}")
         except Exception as e:
             logger.error(f"Failed to connect to Redis: {e}")
             client = None
@@ -170,9 +189,54 @@ async def close():
 async def get_client():
     """Get the Redis client, initializing if necessary."""
     global client, _initialized
+    
+    # If client exists and is initialized, try to use it
+    if client is not None and _initialized:
+        try:
+            # Quick health check
+            await asyncio.wait_for(client.ping(), timeout=1.0)
+            return client
+        except (redis.ConnectionError, redis.TimeoutError, asyncio.TimeoutError) as e:
+            logger.warning(f"Redis health check failed: {e}, reinitializing...")
+            _initialized = False
+            client = None
+    
+    # Initialize or reinitialize
     if client is None or not _initialized:
-        await retry(lambda: initialize_async())
+        try:
+            await retry(lambda: initialize_async())
+        except Exception as e:
+            logger.error(f"Failed to initialize Redis client: {e}")
+            raise
+    
     return client
+
+
+async def check_redis_health():
+    """Check Redis connection health and return status."""
+    try:
+        redis_client = await get_client()
+        await asyncio.wait_for(redis_client.ping(), timeout=2.0)
+        
+        # Get connection pool stats if available
+        if hasattr(redis_client.connection_pool, 'connection_kwargs'):
+            max_conn = redis_client.connection_pool.max_connections
+            created_conn = len(redis_client.connection_pool._created_connections)
+            available_conn = len(redis_client.connection_pool._available_connections)
+            
+            return {
+                "status": "healthy",
+                "max_connections": max_conn,
+                "created_connections": created_conn,
+                "available_connections": available_conn,
+                "connection_usage": f"{created_conn}/{max_conn}"
+            }
+        else:
+            return {"status": "healthy", "details": "connection pool stats unavailable"}
+            
+    except Exception as e:
+        logger.error(f"Redis health check failed: {e}")
+        return {"status": "unhealthy", "error": str(e)}
 
 
 # Basic Redis operations

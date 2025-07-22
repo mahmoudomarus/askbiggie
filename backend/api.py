@@ -195,10 +195,15 @@ api_router.include_router(chat_api.router)
 @api_router.get("/health")
 async def health_check():
     logger.info("Health check endpoint called")
+    
+    # Get Redis health status
+    redis_health = await redis.check_redis_health()
+    
     return {
         "status": "ok", 
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "instance_id": instance_id
+        "instance_id": instance_id,
+        "redis": redis_health
     }
 
 @api_router.get("/health-docker")
