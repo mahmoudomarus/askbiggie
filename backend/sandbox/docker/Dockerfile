@@ -110,10 +110,6 @@ RUN python -c "from playwright.sync_api import sync_playwright; print('Playwrigh
 COPY . /app
 COPY server.py /app/server.py
 COPY browser_api.py /app/browser_api.py
-COPY check_vnc.sh /app/check_vnc.sh
-
-# Make scripts executable
-RUN chmod +x /app/check_vnc.sh
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1

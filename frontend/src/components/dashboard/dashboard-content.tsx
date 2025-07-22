@@ -31,7 +31,6 @@ import { useModal } from '@/hooks/use-modal-store';
 import { Examples } from './examples';
 import { useThreadQuery } from '@/hooks/react-query/threads/use-threads';
 import { normalizeFilenameToNFC } from '@/lib/utils/unicode';
-import { toast } from 'sonner';
 
 const PENDING_PROMPT_KEY = 'pendingAgentPrompt';
 
@@ -105,84 +104,38 @@ export function DashboardContent() {
       enable_context_manager?: boolean;
     },
   ) => {
-    // Enhanced validation with logging
-    console.log('[DASHBOARD] Submit called with:', { 
-      message: `"${message}"`, 
-      messageLength: message?.length || 0,
-      messageTrimmed: message?.trim() || '',
-      trimmedLength: message?.trim()?.length || 0,
-      options 
-    });
-
-    const files = chatInputRef.current?.getPendingFiles() || [];
-    
-    // CRITICAL: Prevent submission if no message and no files
-    if ((!message || !message.trim()) && files.length === 0) {
-      console.warn('[DASHBOARD] Preventing submission: No message and no files');
-      toast.error('Please enter a message or attach files before submitting');
+    if (
+      (!message.trim() && !chatInputRef.current?.getPendingFiles().length) ||
+      isSubmitting
+    )
       return;
-    }
-
-    // Additional safety check for empty/whitespace-only messages
-    const trimmedMessage = message?.trim() || '';
-    if (!trimmedMessage && files.length === 0) {
-      console.warn('[DASHBOARD] Preventing submission: Empty message after trim');
-      toast.error('Please enter a message or attach files before submitting');
-      return;
-    }
-
-    if (isSubmitting) {
-      console.warn('[DASHBOARD] Preventing submission: Already submitting');
-      return;
-    }
 
     setIsSubmitting(true);
 
     try {
+      const files = chatInputRef.current?.getPendingFiles() || [];
       localStorage.removeItem(PENDING_PROMPT_KEY);
 
       const formData = new FormData();
-      
-      // Use trimmed message and ensure it's not empty
-      const finalMessage = trimmedMessage || '';
-      if (!finalMessage && files.length === 0) {
-        throw new Error('No message or files to submit');
-      }
-      
-      formData.append('prompt', finalMessage);
-      console.log('[DASHBOARD] Added prompt to FormData:', `"${finalMessage}"`);
+      formData.append('prompt', message);
 
       // Add selected agent if one is chosen
       if (selectedAgentId) {
         formData.append('agent_id', selectedAgentId);
-        console.log('[DASHBOARD] Added agent_id:', selectedAgentId);
       }
 
       files.forEach((file, index) => {
         const normalizedName = normalizeFilenameToNFC(file.name);
         formData.append('files', file, normalizedName);
-        console.log('[DASHBOARD] Added file:', normalizedName);
       });
 
-      if (options?.model_name) {
-        formData.append('model_name', options.model_name);
-        console.log('[DASHBOARD] Added model_name:', options.model_name);
-      }
+      if (options?.model_name) formData.append('model_name', options.model_name);
       formData.append('enable_thinking', String(options?.enable_thinking ?? false));
       formData.append('reasoning_effort', options?.reasoning_effort ?? 'low');
       formData.append('stream', String(options?.stream ?? true));
       formData.append('enable_context_manager', String(options?.enable_context_manager ?? false));
 
-      // Debug log all FormData entries
-      const formDataEntries = Array.from(formData.entries());
-      console.log('[DASHBOARD] Complete FormData entries:', formDataEntries);
-      
-      // Verify prompt is in FormData
-      const promptEntry = formDataEntries.find(([key]) => key === 'prompt');
-      if (!promptEntry || !promptEntry[1]) {
-        throw new Error('Prompt field is missing or empty in FormData');
-      }
-      console.log('[DASHBOARD] Verified prompt in FormData:', promptEntry[1]);
+      console.log('FormData content:', Array.from(formData.entries()));
 
       const result = await initiateAgentMutation.mutateAsync(formData);
       console.log('Agent initiated:', result);
@@ -198,9 +151,6 @@ export function DashboardContent() {
       if (error instanceof BillingError) {
         console.log('Handling BillingError:', error.detail);
         onOpen("paymentRequiredDialog");
-      } else {
-        // Show user-friendly error message
-        toast.error(error.message || 'Failed to submit. Please try again.');
       }
     } finally {
       setIsSubmitting(false);
