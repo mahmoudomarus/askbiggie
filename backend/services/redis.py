@@ -62,7 +62,6 @@ def initialize():
             socket_keepalive_options={},
             retry_on_timeout=retry_on_timeout,
             retry_on_error=retry_on_error,
-            retry=redis.Retry(redis.ExponentialBackoff(), 3),
             health_check_interval=15,  # More frequent health checks
             max_connections=max_connections,
             ssl_cert_reqs=None if use_ssl else None,
@@ -104,7 +103,6 @@ def initialize():
             socket_keepalive_options={},
             retry_on_timeout=retry_on_timeout,
             retry_on_error=retry_on_error,
-            retry=redis.Retry(redis.ExponentialBackoff(), 3),
             health_check_interval=15,
             max_connections=max_connections,
             ssl=use_ssl,
