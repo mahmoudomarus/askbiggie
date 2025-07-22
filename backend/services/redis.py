@@ -217,10 +217,23 @@ async def check_redis_health():
         await asyncio.wait_for(redis_client.ping(), timeout=2.0)
         
         # Get connection pool stats if available
-        if hasattr(redis_client.connection_pool, 'connection_kwargs'):
-            max_conn = redis_client.connection_pool.max_connections
-            created_conn = len(redis_client.connection_pool._created_connections)
-            available_conn = len(redis_client.connection_pool._available_connections)
+        pool = redis_client.connection_pool
+        if hasattr(pool, 'max_connections'):
+            max_conn = pool.max_connections
+            
+            # Try to get connection counts safely
+            created_conn = 0
+            available_conn = 0
+            
+            if hasattr(pool, '_created_connections'):
+                created_conn = len(pool._created_connections)
+            elif hasattr(pool, 'created_connections'):
+                created_conn = pool.created_connections
+                
+            if hasattr(pool, '_available_connections'):
+                available_conn = len(pool._available_connections) 
+            elif hasattr(pool, 'available_connections'):
+                available_conn = pool.available_connections
             
             return {
                 "status": "healthy",
@@ -230,7 +243,7 @@ async def check_redis_health():
                 "connection_usage": f"{created_conn}/{max_conn}"
             }
         else:
-            return {"status": "healthy", "details": "connection pool stats unavailable"}
+            return {"status": "healthy", "details": "Basic Redis connection working"}
             
     except Exception as e:
         logger.error(f"Redis health check failed: {e}")
