@@ -25,6 +25,8 @@ class SandboxWebSearchTool(SandboxToolsBase):
         self.tavily_api_key = config.TAVILY_API_KEY
         self.firecrawl_api_key = config.FIRECRAWL_API_KEY
         self.firecrawl_url = config.FIRECRAWL_URL
+        # Add Exa AI support
+        self.exa_api_key = getattr(config, 'EXA_API_KEY', None)
         
         if not self.tavily_api_key:
             raise ValueError("TAVILY_API_KEY not found in configuration")
@@ -33,6 +35,21 @@ class SandboxWebSearchTool(SandboxToolsBase):
 
         # Tavily asynchronous search client
         self.tavily_client = AsyncTavilyClient(api_key=self.tavily_api_key)
+        
+        # Exa AI client initialization (if available)
+        self.exa_client = None
+        if self.exa_api_key:
+            try:
+                # Import Exa if available
+                from exa_py import Exa
+                self.exa_client = Exa(api_key=self.exa_api_key)
+                logging.info("Exa AI client initialized successfully")
+            except ImportError:
+                logging.warning("Exa AI library not installed, falling back to Tavily only")
+            except Exception as e:
+                logging.warning(f"Failed to initialize Exa AI client: {e}")
+        else:
+            logging.info("No Exa API key found, using Tavily only")
 
     @openapi_schema({
         "type": "function",
@@ -48,7 +65,7 @@ class SandboxWebSearchTool(SandboxToolsBase):
                     },
                     "num_results": {
                         "type": "integer",
-                        "description": "The number of search results to return. Increase for more comprehensive research or decrease for focused, high-relevance results.",
+                        "description": "The number of search results to return. Increase for more comprehensive research or decrease for focused, high-relevance results. Range: 1-100 for production strength.",
                         "default": 20
                     },
                     "include_domains": {
@@ -63,6 +80,11 @@ class SandboxWebSearchTool(SandboxToolsBase):
                         "type": "string",
                         "description": "Search depth for quality vs speed trade-off. Options: 'basic' (fastest), 'advanced' (balanced), 'comprehensive' (highest quality, slower)",
                         "default": "advanced"
+                    },
+                    "use_exa": {
+                        "type": "boolean",
+                        "description": "Use Exa AI search in addition to Tavily for enhanced academic and professional results. Recommended for research and technical queries.",
+                        "default": False
                     },
                     "topic": {
                         "type": "string",
@@ -90,6 +112,7 @@ class SandboxWebSearchTool(SandboxToolsBase):
             {"param_name": "include_domains", "node_type": "attribute", "path": "."},
             {"param_name": "exclude_domains", "node_type": "attribute", "path": "."},
             {"param_name": "search_depth", "node_type": "attribute", "path": "."},
+            {"param_name": "use_exa", "node_type": "attribute", "path": "."},
             {"param_name": "topic", "node_type": "attribute", "path": "."},
             {"param_name": "days", "node_type": "attribute", "path": "."},
             {"param_name": "max_tokens", "node_type": "attribute", "path": "."}
@@ -102,12 +125,13 @@ class SandboxWebSearchTool(SandboxToolsBase):
         <parameter name="include_domains">reddit.com,bikeforums.net,specialized.com</parameter>
         <parameter name="exclude_domains">pinterest.com,amazon.com</parameter>
         <parameter name="search_depth">comprehensive</parameter>
+        <parameter name="use_exa">true</parameter>
         <parameter name="topic">sports</parameter>
         <parameter name="days">30</parameter>
         </invoke>
         </function_calls>
         
-        <!-- Another advanced search example -->
+        <!-- Academic research example with Exa AI -->
         <function_calls>
         <invoke name="web_search">
         <parameter name="query">latest AI research transformer models 2025</parameter>
@@ -116,6 +140,7 @@ class SandboxWebSearchTool(SandboxToolsBase):
         <parameter name="topic">technology</parameter>
         <parameter name="days">7</parameter>
         <parameter name="search_depth">comprehensive</parameter>
+        <parameter name="use_exa">true</parameter>
         </invoke>
         </function_calls>
         '''
@@ -127,6 +152,7 @@ class SandboxWebSearchTool(SandboxToolsBase):
         include_domains: Optional[str] = None,
         exclude_domains: Optional[str] = None,
         search_depth: str = "advanced",
+        use_exa: bool = False,
         topic: Optional[str] = None,
         days: Optional[int] = None,
         max_tokens: int = 2000
@@ -143,10 +169,10 @@ class SandboxWebSearchTool(SandboxToolsBase):
             if num_results is None:
                 num_results = 20
             elif isinstance(num_results, int):
-                num_results = max(1, min(num_results, 50))
+                num_results = max(1, min(num_results, 100))  # Increased max for production strength
             elif isinstance(num_results, str):
                 try:
-                    num_results = max(1, min(int(num_results), 50))
+                    num_results = max(1, min(int(num_results), 100))  # Increased max for production strength
                 except ValueError:
                     num_results = 20
             else:
@@ -184,6 +210,73 @@ class SandboxWebSearchTool(SandboxToolsBase):
             # Execute the search with Tavily Pro features
             logging.info(f"Executing advanced web search for query: '{query}' with {num_results} results, depth: {search_depth}")
             search_response = await self.tavily_client.search(**search_params)
+            
+            # Enhanced search with Exa AI if requested and available
+            exa_results = None
+            if use_exa and self.exa_client:
+                try:
+                    logging.info(f"Executing additional Exa AI search for query: '{query}'")
+                    exa_search_params = {
+                        "query": query,
+                        "num_results": min(num_results // 2, 10),  # Use half the results for Exa
+                        "include_domains": include_domains.split(',') if include_domains else None,
+                        "exclude_domains": exclude_domains.split(',') if exclude_domains else None,
+                        "use_autoprompt": True,  # Exa's neural search enhancement
+                    }
+                    
+                    # Remove None values from params
+                    exa_search_params = {k: v for k, v in exa_search_params.items() if v is not None}
+                    
+                    exa_response = self.exa_client.search_and_contents(**exa_search_params)
+                    exa_results = {
+                        "results": [
+                            {
+                                "title": result.title,
+                                "url": result.url,
+                                "content": result.text[:max_tokens] if hasattr(result, 'text') and result.text else "",
+                                "published_date": result.published_date if hasattr(result, 'published_date') else None,
+                                "score": result.score if hasattr(result, 'score') else None,
+                                "source": "exa"
+                            }
+                            for result in exa_response.results
+                        ],
+                        "autoprompt_string": getattr(exa_response, 'autoprompt_string', '')
+                    }
+                    logging.info(f"Exa AI search completed with {len(exa_results['results'])} results")
+                    
+                except Exception as exa_error:
+                    logging.warning(f"Exa AI search failed, continuing with Tavily only: {exa_error}")
+                    exa_results = None
+            elif use_exa and not self.exa_client:
+                logging.warning("Exa AI search requested but client not available")
+            
+            # Combine results if both searches were successful
+            if exa_results:
+                # Mark Tavily results as source
+                for result in search_response.get('results', []):
+                    result['source'] = 'tavily'
+                    
+                # Combine results, interleaving for diversity
+                combined_results = []
+                tavily_results = search_response.get('results', [])
+                exa_result_list = exa_results['results']
+                
+                max_combined = max(len(tavily_results), len(exa_result_list))
+                for i in range(max_combined):
+                    if i < len(tavily_results):
+                        combined_results.append(tavily_results[i])
+                    if i < len(exa_result_list):
+                        combined_results.append(exa_result_list[i])
+                
+                # Update the search response with combined results
+                search_response['results'] = combined_results[:num_results]  # Limit to requested number
+                search_response['search_metadata'] = {
+                    "tavily_results": len(tavily_results),
+                    "exa_results": len(exa_result_list),
+                    "exa_autoprompt": exa_results.get('autoprompt_string', ''),
+                    "combined_total": len(combined_results)
+                }
+                logging.info(f"Combined search completed: {len(tavily_results)} Tavily + {len(exa_result_list)} Exa = {len(combined_results)} total")
             
             # Check if we have actual results or an answer
             results = search_response.get('results', [])

@@ -199,6 +199,7 @@ class Configuration:
     
     # Search and other API keys
     TAVILY_API_KEY: str
+    EXA_API_KEY: Optional[str] = None
     RAPID_API_KEY: str
     CLOUDFLARE_API_TOKEN: Optional[str] = None
     FIRECRAWL_API_KEY: str

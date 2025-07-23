@@ -10,14 +10,13 @@ This module provides a unified interface for making API calls to different LLM p
 - Comprehensive error handling and logging
 """
 
+from typing import Union, Dict, Any, Optional, AsyncGenerator, List
 import os
 import json
-import logging
-import ssl
 import asyncio
-from typing import Dict, Any, Optional, AsyncGenerator, Union, List
+from openai import OpenAIError
 import litellm
-from litellm import acompletion, ModelResponse
+from litellm.files.main import ModelResponse
 from utils.logger import logger
 from utils.config import config
 
@@ -89,6 +88,14 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         "qwen/qwen3-235b-a22b": "openrouter/qwen/qwen3-235b-a22b",
     }
 
+    # Model fallback hierarchy for overload situations
+    ANTHROPIC_FALLBACKS = [
+        "openrouter/anthropic/claude-3.5-sonnet",
+        "openrouter/qwen/qwen3-32b",
+        "openrouter/x-ai/grok-2",
+        "openrouter/deepseek/deepseek-v3"
+    ]
+
     # Apply fallback mapping first
     if model_name in fallback_mapping:
         logger.info(f"Mapping model {model_name} to {fallback_mapping[model_name]}")
@@ -110,43 +117,6 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         return "openrouter/qwen/qwen3-32b"
     
     return None
-
-
-def get_openrouter_fallback_chain(model_name: str) -> List[str]:
-    """Get a complete fallback chain for OpenRouter models with proper cascading."""
-    fallback_chain = []
-    
-    # For Anthropic models, use the premium OpenRouter pipeline
-    if "claude" in model_name.lower() or "anthropic" in model_name.lower():
-        fallback_chain = [
-            "openrouter/anthropic/claude-sonnet-4",     # Primary: Latest Sonnet 4
-            "openrouter/anthropic/claude-3.5-sonnet",  # Fallback 1: Sonnet 3.5
-            "openrouter/x-ai/grok-4",                  # Fallback 2: Grok 4
-            "openrouter/qwen/qwen3-235b-a22b",         # Fallback 3: Qwen3 235B
-            "openrouter/deepseek/deepseek-v3"          # Emergency: DeepSeek V3
-        ]
-    # For other models, use appropriate chains
-    elif "grok" in model_name.lower() or "xai" in model_name.lower():
-        fallback_chain = [
-            "openrouter/x-ai/grok-4",
-            "openrouter/anthropic/claude-3.5-sonnet", 
-            "openrouter/qwen/qwen3-32b"
-        ]
-    elif "qwen" in model_name.lower():
-        fallback_chain = [
-            "openrouter/qwen/qwen3-235b-a22b",
-            "openrouter/qwen/qwen3-32b",
-            "openrouter/anthropic/claude-3.5-sonnet"
-        ]
-    else:
-        # Default premium chain for unknown models
-        fallback_chain = [
-            "openrouter/anthropic/claude-sonnet-4",
-            "openrouter/anthropic/claude-3.5-sonnet",
-            "openrouter/qwen/qwen3-32b"
-        ]
-    
-    return fallback_chain
 
 async def handle_error(error: Exception, attempt: int, max_attempts: int) -> None:
     """Handle API errors with appropriate delays and logging."""
@@ -371,32 +341,50 @@ async def make_llm_api_call(
             logger.debug(f"Successfully received API response from {model_name}")
             return response
             
-        except litellm.exceptions.InternalServerError as e:
-            # Check if it's an Anthropic overloaded error
-            if "Overloaded" in str(e) and "AnthropicException" in str(e):
-                logger.warning(f"🚨 Anthropic model {model_name} is overloaded, trying OpenRouter fallback chain...")
+        except (litellm.exceptions.InternalServerError, litellm.exceptions.ServiceUnavailableError) as e:
+            error_str = str(e).lower()
+            
+            # Enhanced overload detection across all providers
+            is_overloaded = any(pattern in error_str for pattern in OVERLOAD_PATTERNS)
+            
+            if is_overloaded:
+                logger.warning(f"🚨 Model {model_name} is overloaded/rate-limited, trying production fallbacks...")
                 
-                # Get the appropriate fallback chain for this model
-                fallback_models = get_openrouter_fallback_chain(model_name)
+                # Determine appropriate fallback chain
+                if "anthropic" in model_name.lower():
+                    # Use legacy Anthropic fallbacks for Anthropic-specific models
+                    fallback_models = ANTHROPIC_FALLBACKS
+                else:
+                    # Use full production chain for all other models
+                    fallback_models = PRODUCTION_FALLBACK_CHAIN
+                
+                # Filter out the current model from fallbacks to avoid loops
+                fallback_models = [m for m in fallback_models if m != model_name]
                 
                 # Try fallback models in order
                 for fallback_model in fallback_models:
                     try:
-                        logger.info(f"🔄 Trying fallback model: {fallback_model}")
+                        logger.info(f"🔄 Trying production fallback: {fallback_model}")
                         fallback_params = params.copy()
                         fallback_params["model"] = fallback_model
                         fallback_params.pop("model_id", None)  # Remove Bedrock-specific param
-                        fallback_params.pop("fallbacks", None)  # Remove existing fallbacks to prevent loops
+                        
                         response = await litellm.acompletion(**fallback_params)
-                        logger.info(f"✅ Successfully switched to fallback model: {fallback_model}")
+                        logger.info(f"✅ Successfully switched to production fallback: {fallback_model}")
                         return response
                         
                     except Exception as fallback_error:
-                        logger.warning(f"❌ Fallback model {fallback_model} also failed: {fallback_error}")
+                        fallback_error_str = str(fallback_error).lower()
+                        is_fallback_overloaded = any(pattern in fallback_error_str for pattern in OVERLOAD_PATTERNS)
+                        
+                        if is_fallback_overloaded:
+                            logger.warning(f"⚠️ Fallback {fallback_model} also overloaded, trying next...")
+                        else:
+                            logger.warning(f"❌ Fallback {fallback_model} failed with different error: {fallback_error}")
                         continue
                 
                 # If all fallbacks failed, continue with retry logic
-                logger.error(f"🚫 All OpenRouter fallback models failed for overloaded Anthropic model")
+                logger.error(f"🚫 All production fallback models failed for overloaded model {model_name}")
                 last_error = e
                 await handle_error(e, attempt, MAX_RETRIES)
             else:
@@ -404,7 +392,7 @@ async def make_llm_api_call(
                 last_error = e
                 await handle_error(e, attempt, MAX_RETRIES)
 
-        except (litellm.exceptions.RateLimitError, json.JSONDecodeError) as e:
+        except (litellm.exceptions.RateLimitError, OpenAIError, json.JSONDecodeError) as e:
             last_error = e
             await handle_error(e, attempt, MAX_RETRIES)
 
@@ -417,6 +405,34 @@ async def make_llm_api_call(
         error_msg += f". Last error: {str(last_error)}"
     logger.error(error_msg, exc_info=True)
     raise LLMRetryError(error_msg)
+
+# Enhanced Production Model Fallback Chain
+PRODUCTION_FALLBACK_CHAIN = [
+    # Primary Anthropic Claude models
+    "anthropic/claude-sonnet-4:thinking",
+    "anthropic/claude-3.5-sonnet",
+    
+    # OpenRouter fallbacks with high reliability
+    "openrouter/anthropic/claude-sonnet-4:thinking", 
+    "openrouter/anthropic/claude-3.5-sonnet",
+    "openrouter/x-ai/grok-4",
+    "openrouter/qwen/qwen3-235b-a22b",
+    "openrouter/google/gemini-2.5-pro",
+    "openrouter/openai/gpt-4o",
+]
+
+# Legacy Anthropic fallbacks (keeping for backward compatibility)
+ANTHROPIC_FALLBACKS = [
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-3-haiku-20240307"
+]
+
+# Overload detection patterns
+OVERLOAD_PATTERNS = [
+    "overloaded", "rate limit", "service unavailable", 
+    "temporarily unavailable", "capacity", "quota exceeded",
+    "too many requests", "server overloaded"
+]
 
 # Initialize API keys on module import
 setup_api_keys()
