@@ -192,12 +192,6 @@ class Configuration:
     SUPABASE_ANON_KEY: str
     SUPABASE_SERVICE_ROLE_KEY: str
     
-    # Redis configuration
-    REDIS_HOST: str
-    REDIS_PORT: int = 6379
-    REDIS_PASSWORD: Optional[str] = None
-    REDIS_SSL: bool = True
-    
     # Daytona sandbox configuration
     DAYTONA_API_KEY: str
     DAYTONA_SERVER_URL: str
