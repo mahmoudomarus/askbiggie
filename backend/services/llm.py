@@ -10,13 +10,14 @@ This module provides a unified interface for making API calls to different LLM p
 - Comprehensive error handling and logging
 """
 
-from typing import Union, Dict, Any, Optional, AsyncGenerator, List
 import os
 import json
+import logging
+import ssl
 import asyncio
-from openai import OpenAIError
+from typing import Dict, Any, Optional, AsyncGenerator, Union, List
 import litellm
-from litellm.files.main import ModelResponse
+from litellm import acompletion, ModelResponse
 from utils.logger import logger
 from utils.config import config
 
@@ -88,14 +89,6 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         "qwen/qwen3-235b-a22b": "openrouter/qwen/qwen3-235b-a22b",
     }
 
-    # Model fallback hierarchy for overload situations
-    ANTHROPIC_FALLBACKS = [
-        "openrouter/anthropic/claude-3.5-sonnet",
-        "openrouter/qwen/qwen3-32b",
-        "openrouter/x-ai/grok-2",
-        "openrouter/deepseek/deepseek-v3"
-    ]
-
     # Apply fallback mapping first
     if model_name in fallback_mapping:
         logger.info(f"Mapping model {model_name} to {fallback_mapping[model_name]}")
@@ -117,6 +110,43 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         return "openrouter/qwen/qwen3-32b"
     
     return None
+
+
+def get_openrouter_fallback_chain(model_name: str) -> List[str]:
+    """Get a complete fallback chain for OpenRouter models with proper cascading."""
+    fallback_chain = []
+    
+    # For Anthropic models, use the premium OpenRouter pipeline
+    if "claude" in model_name.lower() or "anthropic" in model_name.lower():
+        fallback_chain = [
+            "openrouter/anthropic/claude-sonnet-4",     # Primary: Latest Sonnet 4
+            "openrouter/anthropic/claude-3.5-sonnet",  # Fallback 1: Sonnet 3.5
+            "openrouter/x-ai/grok-4",                  # Fallback 2: Grok 4
+            "openrouter/qwen/qwen3-235b-a22b",         # Fallback 3: Qwen3 235B
+            "openrouter/deepseek/deepseek-v3"          # Emergency: DeepSeek V3
+        ]
+    # For other models, use appropriate chains
+    elif "grok" in model_name.lower() or "xai" in model_name.lower():
+        fallback_chain = [
+            "openrouter/x-ai/grok-4",
+            "openrouter/anthropic/claude-3.5-sonnet", 
+            "openrouter/qwen/qwen3-32b"
+        ]
+    elif "qwen" in model_name.lower():
+        fallback_chain = [
+            "openrouter/qwen/qwen3-235b-a22b",
+            "openrouter/qwen/qwen3-32b",
+            "openrouter/anthropic/claude-3.5-sonnet"
+        ]
+    else:
+        # Default premium chain for unknown models
+        fallback_chain = [
+            "openrouter/anthropic/claude-sonnet-4",
+            "openrouter/anthropic/claude-3.5-sonnet",
+            "openrouter/qwen/qwen3-32b"
+        ]
+    
+    return fallback_chain
 
 async def handle_error(error: Exception, attempt: int, max_attempts: int) -> None:
     """Handle API errors with appropriate delays and logging."""
@@ -344,15 +374,19 @@ async def make_llm_api_call(
         except litellm.exceptions.InternalServerError as e:
             # Check if it's an Anthropic overloaded error
             if "Overloaded" in str(e) and "AnthropicException" in str(e):
-                logger.warning(f"🚨 Anthropic model {model_name} is overloaded, trying fallbacks...")
+                logger.warning(f"🚨 Anthropic model {model_name} is overloaded, trying OpenRouter fallback chain...")
+                
+                # Get the appropriate fallback chain for this model
+                fallback_models = get_openrouter_fallback_chain(model_name)
                 
                 # Try fallback models in order
-                for fallback_model in ANTHROPIC_FALLBACKS:
+                for fallback_model in fallback_models:
                     try:
                         logger.info(f"🔄 Trying fallback model: {fallback_model}")
                         fallback_params = params.copy()
                         fallback_params["model"] = fallback_model
                         fallback_params.pop("model_id", None)  # Remove Bedrock-specific param
+                        fallback_params.pop("fallbacks", None)  # Remove existing fallbacks to prevent loops
                         response = await litellm.acompletion(**fallback_params)
                         logger.info(f"✅ Successfully switched to fallback model: {fallback_model}")
                         return response
@@ -362,7 +396,7 @@ async def make_llm_api_call(
                         continue
                 
                 # If all fallbacks failed, continue with retry logic
-                logger.error(f"🚫 All fallback models failed for overloaded Anthropic model")
+                logger.error(f"🚫 All OpenRouter fallback models failed for overloaded Anthropic model")
                 last_error = e
                 await handle_error(e, attempt, MAX_RETRIES)
             else:
@@ -370,7 +404,7 @@ async def make_llm_api_call(
                 last_error = e
                 await handle_error(e, attempt, MAX_RETRIES)
 
-        except (litellm.exceptions.RateLimitError, OpenAIError, json.JSONDecodeError) as e:
+        except (litellm.exceptions.RateLimitError, json.JSONDecodeError) as e:
             last_error = e
             await handle_error(e, attempt, MAX_RETRIES)
 

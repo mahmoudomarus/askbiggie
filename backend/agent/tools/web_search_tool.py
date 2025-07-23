@@ -10,6 +10,7 @@ import os
 import datetime
 import asyncio
 import logging
+from typing import Optional
 
 # TODO: add subpages, etc... in filters as sometimes its necessary 
 
@@ -37,7 +38,7 @@ class SandboxWebSearchTool(SandboxToolsBase):
         "type": "function",
         "function": {
             "name": "web_search",
-            "description": "Search the web for up-to-date information on a specific topic using the Tavily API. This tool allows you to gather real-time information from the internet to answer user queries, research topics, validate facts, and find recent developments. Results include titles, URLs, and publication dates. Use this tool for discovering relevant web pages before potentially crawling them for complete content.",
+            "description": "Search the web for up-to-date information on a specific topic using advanced Tavily Pro API features. This tool provides enterprise-grade search with domain filtering, content type targeting, and geographic filtering for precise results.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -49,6 +50,32 @@ class SandboxWebSearchTool(SandboxToolsBase):
                         "type": "integer",
                         "description": "The number of search results to return. Increase for more comprehensive research or decrease for focused, high-relevance results.",
                         "default": 20
+                    },
+                    "include_domains": {
+                        "type": "string",
+                        "description": "Comma-separated list of domains to include in search (e.g., 'reddit.com,stackoverflow.com'). Use to focus on specific trusted sources."
+                    },
+                    "exclude_domains": {
+                        "type": "string", 
+                        "description": "Comma-separated list of domains to exclude from search (e.g., 'pinterest.com,quora.com'). Use to filter out low-quality sources."
+                    },
+                    "search_depth": {
+                        "type": "string",
+                        "description": "Search depth for quality vs speed trade-off. Options: 'basic' (fastest), 'advanced' (balanced), 'comprehensive' (highest quality, slower)",
+                        "default": "advanced"
+                    },
+                    "topic": {
+                        "type": "string",
+                        "description": "Content topic filter. Options: 'general', 'news', 'finance', 'technology', 'science', 'sports', 'entertainment' to prioritize relevant content types."
+                    },
+                    "days": {
+                        "type": "integer",
+                        "description": "Number of days to look back for content. Use for time-sensitive queries (e.g., 7 for last week, 30 for last month)."
+                    },
+                    "max_tokens": {
+                        "type": "integer", 
+                        "description": "Maximum tokens per search result content. Higher values give more detail but use more context. Range: 500-4000.",
+                        "default": 2000
                     }
                 },
                 "required": ["query"]
@@ -59,21 +86,36 @@ class SandboxWebSearchTool(SandboxToolsBase):
         tag_name="web-search",
         mappings=[
             {"param_name": "query", "node_type": "attribute", "path": "."},
-            {"param_name": "num_results", "node_type": "attribute", "path": "."}
+            {"param_name": "num_results", "node_type": "attribute", "path": "."},
+            {"param_name": "include_domains", "node_type": "attribute", "path": "."},
+            {"param_name": "exclude_domains", "node_type": "attribute", "path": "."},
+            {"param_name": "search_depth", "node_type": "attribute", "path": "."},
+            {"param_name": "topic", "node_type": "attribute", "path": "."},
+            {"param_name": "days", "node_type": "attribute", "path": "."},
+            {"param_name": "max_tokens", "node_type": "attribute", "path": "."}
         ],
         example='''
         <function_calls>
         <invoke name="web_search">
-        <parameter name="query">what is Kortix AI and what are they building?</parameter>
-        <parameter name="num_results">20</parameter>
+        <parameter name="query">BMX bikes for urban commuting under $350</parameter>
+        <parameter name="num_results">15</parameter>
+        <parameter name="include_domains">reddit.com,bikeforums.net,specialized.com</parameter>
+        <parameter name="exclude_domains">pinterest.com,amazon.com</parameter>
+        <parameter name="search_depth">comprehensive</parameter>
+        <parameter name="topic">sports</parameter>
+        <parameter name="days">30</parameter>
         </invoke>
         </function_calls>
         
-        <!-- Another search example -->
+        <!-- Another advanced search example -->
         <function_calls>
         <invoke name="web_search">
-        <parameter name="query">latest AI research on transformer models</parameter>
+        <parameter name="query">latest AI research transformer models 2025</parameter>
         <parameter name="num_results">20</parameter>
+        <parameter name="include_domains">arxiv.org,nature.com,acm.org</parameter>
+        <parameter name="topic">technology</parameter>
+        <parameter name="days">7</parameter>
+        <parameter name="search_depth">comprehensive</parameter>
         </invoke>
         </function_calls>
         '''
@@ -81,10 +123,16 @@ class SandboxWebSearchTool(SandboxToolsBase):
     async def web_search(
         self, 
         query: str,
-        num_results: int = 20
+        num_results: int = 20,
+        include_domains: Optional[str] = None,
+        exclude_domains: Optional[str] = None,
+        search_depth: str = "advanced",
+        topic: Optional[str] = None,
+        days: Optional[int] = None,
+        max_tokens: int = 2000
     ) -> ToolResult:
         """
-        Search the web using the Tavily API to find relevant and up-to-date information.
+        Search the web using the Tavily API with advanced Pro features for enhanced results.
         """
         try:
             # Ensure we have a valid query
@@ -104,15 +152,38 @@ class SandboxWebSearchTool(SandboxToolsBase):
             else:
                 num_results = 20
 
-            # Execute the search with Tavily
-            logging.info(f"Executing web search for query: '{query}' with {num_results} results")
-            search_response = await self.tavily_client.search(
-                query=query,
-                max_results=num_results,
-                include_images=True,
-                include_answer="advanced",
-                search_depth="advanced",
-            )
+            # Build search parameters with advanced features
+            search_params = {
+                "query": query,
+                "max_results": num_results,
+                "include_images": True,
+                "include_answer": "advanced",
+                "search_depth": search_depth,
+                "max_tokens": max_tokens
+            }
+            
+            # Add domain filtering if specified
+            if include_domains:
+                domain_list = [d.strip() for d in include_domains.split(',') if d.strip()]
+                if domain_list:
+                    search_params["include_domains"] = domain_list
+            
+            if exclude_domains:
+                domain_list = [d.strip() for d in exclude_domains.split(',') if d.strip()]
+                if domain_list:
+                    search_params["exclude_domains"] = domain_list
+            
+            # Add topic filtering if specified
+            if topic and topic != "general":
+                search_params["topic"] = topic
+                
+            # Add date filtering if specified
+            if days and days > 0:
+                search_params["days"] = days
+
+            # Execute the search with Tavily Pro features
+            logging.info(f"Executing advanced web search for query: '{query}' with {num_results} results, depth: {search_depth}")
+            search_response = await self.tavily_client.search(**search_params)
             
             # Check if we have actual results or an answer
             results = search_response.get('results', [])
