@@ -85,10 +85,20 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         "qwen/qwen3-32b": "openrouter/qwen/qwen3-32b",
         "qwen/qwen3-30b-a3b": "openrouter/qwen/qwen3-30b-a3b",
         "qwen/qwen3-30b-a3b:free": "openrouter/qwen/qwen3-30b-a3b:free",
+        "qwen/qwen3-235b-a22b": "openrouter/qwen/qwen3-235b-a22b",
     }
-    
-    # Check for exact match first
+
+    # Model fallback hierarchy for overload situations
+    ANTHROPIC_FALLBACKS = [
+        "openrouter/anthropic/claude-3.5-sonnet",
+        "openrouter/qwen/qwen3-32b",
+        "openrouter/x-ai/grok-2",
+        "openrouter/deepseek/deepseek-v3"
+    ]
+
+    # Apply fallback mapping first
     if model_name in fallback_mapping:
+        logger.info(f"Mapping model {model_name} to {fallback_mapping[model_name]}")
         return fallback_mapping[model_name]
     
     # Check for partial matches (e.g., bedrock models)
@@ -279,7 +289,7 @@ async def make_llm_api_call(
 ) -> Union[Dict[str, Any], AsyncGenerator, ModelResponse]:
     """
     Make an API call to a language model using LiteLLM.
-
+    
     Args:
         messages: List of message dictionaries for the conversation
         model_name: Name of the model to use (e.g., "gpt-4", "claude-3", "openrouter/openai/gpt-4", "bedrock/anthropic.claude-3-sonnet-20240229-v1:0")
@@ -295,17 +305,17 @@ async def make_llm_api_call(
         model_id: Optional ARN for Bedrock inference profiles
         enable_thinking: Whether to enable thinking
         reasoning_effort: Level of reasoning effort
-
+        
     Returns:
         Union[Dict[str, Any], AsyncGenerator]: API response or stream
-
+        
     Raises:
         LLMRetryError: If API call fails after retries
         LLMError: For other API-related errors
     """
-    # debug <timestamp>.json messages
     logger.info(f"Making LLM API call to model: {model_name} (Thinking: {enable_thinking}, Effort: {reasoning_effort})")
     logger.info(f"📡 API Call: Using model {model_name}")
+    
     params = prepare_params(
         messages=messages,
         model_name=model_name,
@@ -322,33 +332,39 @@ async def make_llm_api_call(
         enable_thinking=enable_thinking,
         reasoning_effort=reasoning_effort
     )
+    
     last_error = None
     for attempt in range(MAX_RETRIES):
         try:
             logger.debug(f"Attempt {attempt + 1}/{MAX_RETRIES}")
-            # logger.debug(f"API request parameters: {json.dumps(params, indent=2)}")
-
             response = await litellm.acompletion(**params)
             logger.debug(f"Successfully received API response from {model_name}")
-            # logger.debug(f"Response: {response}")
             return response
-
+            
         except litellm.exceptions.InternalServerError as e:
             # Check if it's an Anthropic overloaded error
             if "Overloaded" in str(e) and "AnthropicException" in str(e):
-                fallback_model = get_openrouter_fallback(model_name)
-                if fallback_model and not params.get("model", "").startswith("openrouter/"):
-                    logger.warning(f"Anthropic overloaded, falling back to OpenRouter: {fallback_model}")
-                    params["model"] = fallback_model
-                    # Remove any model_id as it's specific to Bedrock
-                    params.pop("model_id", None)
-                    # Continue with next attempt using fallback model
-                    last_error = e
-                    await handle_error(e, attempt, MAX_RETRIES)
-                else:
-                    # No fallback available or already using OpenRouter
-                    last_error = e
-                    await handle_error(e, attempt, MAX_RETRIES)
+                logger.warning(f"🚨 Anthropic model {model_name} is overloaded, trying fallbacks...")
+                
+                # Try fallback models in order
+                for fallback_model in ANTHROPIC_FALLBACKS:
+                    try:
+                        logger.info(f"🔄 Trying fallback model: {fallback_model}")
+                        fallback_params = params.copy()
+                        fallback_params["model"] = fallback_model
+                        fallback_params.pop("model_id", None)  # Remove Bedrock-specific param
+                        response = await litellm.acompletion(**fallback_params)
+                        logger.info(f"✅ Successfully switched to fallback model: {fallback_model}")
+                        return response
+                        
+                    except Exception as fallback_error:
+                        logger.warning(f"❌ Fallback model {fallback_model} also failed: {fallback_error}")
+                        continue
+                
+                # If all fallbacks failed, continue with retry logic
+                logger.error(f"🚫 All fallback models failed for overloaded Anthropic model")
+                last_error = e
+                await handle_error(e, attempt, MAX_RETRIES)
             else:
                 # Other internal server errors
                 last_error = e

@@ -507,6 +507,26 @@ async def get_thread_agent(thread_id: str, user_id: str = Depends(get_current_us
                 "message": "No agent configured for this thread. Threads are agent-agnostic - you can select any agent."
             }
         
+        # Handle special case for Fast Biggie (not in database)
+        if effective_agent_id == "fast_biggie":
+            return {
+                "agent": {
+                    "agent_id": "fast_biggie",
+                    "account_id": account_id,
+                    "name": "Fast Biggie",
+                    "description": "Quick AI conversations without tools - perfect for fast questions and research",
+                    "system_prompt": "You are Fast Biggie, a streamlined AI assistant focused on quick, helpful responses without complex tool usage.",
+                    "configured_mcps": [],
+                    "custom_mcps": [],
+                    "agentpress_tools": {},
+                    "is_default": False,
+                    "is_public": True,
+                    "agent_versions": []
+                },
+                "source": agent_source,
+                "message": "Using Fast Biggie for quick conversations"
+            }
+        
         # Fetch the agent details with version information
         agent_result = await client.table('agents').select('*, agent_versions!current_version_id(*)').eq('agent_id', effective_agent_id).eq('account_id', account_id).execute()
         
