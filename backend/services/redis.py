@@ -195,6 +195,17 @@ async def delete(key: str):
     return await redis_client.delete(key)
 
 
+async def check_redis_health():
+    """Check Redis health by attempting to ping."""
+    try:
+        redis_client = await get_client()
+        result = await redis_client.ping()
+        return {"status": "healthy", "ping": result}
+    except Exception as e:
+        logger.error(f"Redis health check failed: {e}")
+        return {"status": "unhealthy", "error": str(e)}
+
+
 async def publish(channel: str, message: str):
     """Publish a message to a Redis channel."""
     redis_client = await get_client()

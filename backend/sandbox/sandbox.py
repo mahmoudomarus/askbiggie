@@ -108,7 +108,7 @@ async def create_sandbox(password: str, project_id: str = None) -> AsyncSandbox:
         },
         resources=Resources(
             cpu=2,
-            memory=4,
+            memory=6,
             disk=5,
         ),
         auto_stop_interval=15,

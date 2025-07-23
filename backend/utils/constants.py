@@ -27,6 +27,30 @@ MODELS = {
         },
         "tier_availability": ["free", "paid"]
     },
+    "openrouter/qwen/qwen3-32b": {
+        "aliases": ["qwen3-32b"],
+        "pricing": {
+            "input_cost_per_million_tokens": 0.027,
+            "output_cost_per_million_tokens": 0.027
+        },
+        "tier_availability": ["free", "paid"]
+    },
+    "openrouter/qwen/qwen3-30b-a3b": {
+        "aliases": ["qwen3-30b"],
+        "pricing": {
+            "input_cost_per_million_tokens": 0.08,
+            "output_cost_per_million_tokens": 0.29
+        },
+        "tier_availability": ["free", "paid"]
+    },
+    "openrouter/qwen/qwen3-30b-a3b:free": {
+        "aliases": ["qwen3-30b-free"],
+        "pricing": {
+            "input_cost_per_million_tokens": 0.0,
+            "output_cost_per_million_tokens": 0.0
+        },
+        "tier_availability": ["free", "paid"]
+    },
     "openrouter/google/gemini-2.5-flash-preview-05-20": {
         "aliases": ["gemini-flash-2.5"],
         "pricing": {
@@ -108,14 +132,6 @@ MODELS = {
         "pricing": {
             "input_cost_per_million_tokens": 0.25,
             "output_cost_per_million_tokens": 1.00
-        },
-        "tier_availability": ["free", "paid"]
-    },
-    "openrouter/qwen/qwen3-235b-a22b-07-25": {
-        "aliases": ["qwen3", "qwen3-235b", "qwen3-235b-a22b"],
-        "pricing": {
-            "input_cost_per_million_tokens": 0.13,
-            "output_cost_per_million_tokens": 0.60
         },
         "tier_availability": ["free", "paid"]
     },

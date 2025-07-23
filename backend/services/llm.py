@@ -78,9 +78,13 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         "xai/grok-4": "openrouter/x-ai/grok-4",
         "kimi-k2": "openrouter/moonshotai/kimi-k2",
         "moonshotai/kimi-k2": "openrouter/moonshotai/kimi-k2",
-        "qwen3": "openrouter/qwen/qwen3-235b-a22b-07-25",
-        "qwen3-235b": "openrouter/qwen/qwen3-235b-a22b-07-25",
-        "qwen/qwen3-235b-a22b-07-25": "openrouter/qwen/qwen3-235b-a22b-07-25",
+        "qwen3": "openrouter/qwen/qwen3-235b-a22b",
+        "qwen3-32b": "openrouter/qwen/qwen3-32b",
+        "qwen3-30b": "openrouter/qwen/qwen3-30b-a3b",
+        "qwen3-30b-free": "openrouter/qwen/qwen3-30b-a3b:free",
+        "qwen/qwen3-32b": "openrouter/qwen/qwen3-32b",
+        "qwen/qwen3-30b-a3b": "openrouter/qwen/qwen3-30b-a3b",
+        "qwen/qwen3-30b-a3b:free": "openrouter/qwen/qwen3-30b-a3b:free",
     }
     
     # Check for exact match first
@@ -100,7 +104,7 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
     elif "kimi" in model_name.lower() or "moonshot" in model_name.lower():
         return "openrouter/moonshotai/kimi-k2"
     elif "qwen" in model_name.lower():
-        return "openrouter/qwen/qwen3-235b-a22b-07-25"
+        return "openrouter/qwen/qwen3-32b"
     
     return None
 
