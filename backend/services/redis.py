@@ -36,7 +36,7 @@ def initialize():
         use_ssl = parsed_url.scheme == 'rediss'
         
         # Connection pool configuration
-        max_connections = 250
+        max_connections = int(os.getenv("REDIS_MAX_CONNECTIONS", 200))
         socket_timeout = 15.0
         connect_timeout = 10.0
         retry_on_timeout = not (os.getenv("REDIS_RETRY_ON_TIMEOUT", "True").lower() != "true")
@@ -72,7 +72,7 @@ def initialize():
         use_ssl = os.getenv("REDIS_SSL", "false").lower() == "true"
         
         # Connection pool configuration - optimized for production
-        max_connections = 250
+        max_connections = int(os.getenv("REDIS_MAX_CONNECTIONS", 200))
         socket_timeout = 15.0
         connect_timeout = 10.0
         retry_on_timeout = not (os.getenv("REDIS_RETRY_ON_TIMEOUT", "True").lower() != "true")
