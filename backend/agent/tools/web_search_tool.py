@@ -66,7 +66,7 @@ class SandboxWebSearchTool(SandboxToolsBase):
                     "num_results": {
                         "type": "integer",
                         "description": "The number of search results to return. Increase for more comprehensive research or decrease for focused, high-relevance results. Range: 1-100 for production strength.",
-                        "default": 20
+                        "default": 50
                     },
                     "include_domains": {
                         "type": "string",
@@ -121,7 +121,7 @@ class SandboxWebSearchTool(SandboxToolsBase):
         <function_calls>
         <invoke name="web_search">
         <parameter name="query">BMX bikes for urban commuting under $350</parameter>
-        <parameter name="num_results">15</parameter>
+        <parameter name="num_results">50</parameter>
         <parameter name="include_domains">reddit.com,bikeforums.net,specialized.com</parameter>
         <parameter name="exclude_domains">pinterest.com,amazon.com</parameter>
         <parameter name="search_depth">comprehensive</parameter>
@@ -135,7 +135,7 @@ class SandboxWebSearchTool(SandboxToolsBase):
         <function_calls>
         <invoke name="web_search">
         <parameter name="query">latest AI research transformer models 2025</parameter>
-        <parameter name="num_results">20</parameter>
+        <parameter name="num_results">50</parameter>
         <parameter name="include_domains">arxiv.org,nature.com,acm.org</parameter>
         <parameter name="topic">technology</parameter>
         <parameter name="days">7</parameter>
@@ -148,7 +148,7 @@ class SandboxWebSearchTool(SandboxToolsBase):
     async def web_search(
         self, 
         query: str,
-        num_results: int = 20,
+        num_results: int = 50,
         include_domains: Optional[str] = None,
         exclude_domains: Optional[str] = None,
         search_depth: str = "advanced",
@@ -167,16 +167,16 @@ class SandboxWebSearchTool(SandboxToolsBase):
             
             # Normalize num_results
             if num_results is None:
-                num_results = 20
+                num_results = 50
             elif isinstance(num_results, int):
                 num_results = max(1, min(num_results, 100))  # Increased max for production strength
             elif isinstance(num_results, str):
                 try:
                     num_results = max(1, min(int(num_results), 100))  # Increased max for production strength
                 except ValueError:
-                    num_results = 20
+                    num_results = 50
             else:
-                num_results = 20
+                num_results = 50
 
             # Build search parameters with advanced features
             search_params = {
@@ -303,6 +303,27 @@ class SandboxWebSearchTool(SandboxToolsBase):
         except Exception as e:
             error_message = str(e)
             logging.error(f"Error performing web search for '{query}': {error_message}")
+            
+            # Implement retry logic for transient failures
+            if "timeout" in error_message.lower() or "connection" in error_message.lower():
+                logging.info(f"Retrying search for '{query}' due to transient error")
+                try:
+                    # Retry with simpler parameters
+                    retry_params = {
+                        "query": query,
+                        "max_results": min(num_results, 20),  # Reduce results for retry
+                        "include_answer": "basic",
+                        "search_depth": "basic"
+                    }
+                    retry_response = await self.tavily_client.search(**retry_params)
+                    logging.info(f"Retry successful for query: '{query}'")
+                    return ToolResult(
+                        success=True,
+                        output=json.dumps(retry_response, ensure_ascii=False)
+                    )
+                except Exception as retry_error:
+                    logging.error(f"Retry also failed for '{query}': {str(retry_error)}")
+            
             simplified_message = f"Error performing web search: {error_message[:200]}"
             if len(error_message) > 200:
                 simplified_message += "..."

@@ -207,3 +207,4 @@ backend/.env.backup
 backend/.env.bak
 *.env.backup
 *.env.bak
+.vercel

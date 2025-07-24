@@ -849,7 +849,7 @@ export function FileViewerModal({
     return filePath ? filePath.toLowerCase().endsWith('.md') : false;
   }, []);
 
-  // Handle PDF export for markdown files
+  // Handle PDF export for markdown files  
   const handleExportPdf = useCallback(
     async (orientation: 'portrait' | 'landscape' = 'portrait') => {
       if (
@@ -867,151 +867,69 @@ export function FileViewerModal({
           throw new Error('Markdown content not found');
         }
 
-        // Create a standalone document for printing
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-          throw new Error(
-            'Unable to open print window. Please check if popup blocker is enabled.',
-          );
-        }
-
-        // Get the base URL for resolving relative URLs
-        const _baseUrl = window.location.origin;
+        // Import html2pdf.js dynamically
+        const html2pdf = (await import('html2pdf.js')).default;
 
         // Generate HTML content
         const fileName = selectedFilePath.split('/').pop() || 'document';
         const pdfName = fileName.replace(/\.md$/, '');
 
-        // Extract content
+        // Extract content and clean it for PDF
         const markdownContent = markdownRef.current.innerHTML;
 
-        // Generate a full HTML document with controlled styles
-        const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>${pdfName}</title>
-          <style>
-            @media print {
-              @page { 
-                size: ${orientation === 'landscape' ? 'A4 landscape' : 'A4'};
-                margin: 15mm;
-              }
-              body {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-              }
-            }
-            body {
-              font-family: 'Helvetica', 'Arial', sans-serif;
-              font-size: 12pt;
-              color: #333;
-              line-height: 1.5;
-              padding: 20px;
-              max-width: 100%;
-              margin: 0 auto;
-              background: white;
-            }
-            h1 { font-size: 24pt; margin-top: 20pt; margin-bottom: 12pt; }
-            h2 { font-size: 20pt; margin-top: 18pt; margin-bottom: 10pt; }
-            h3 { font-size: 16pt; margin-top: 16pt; margin-bottom: 8pt; }
-            h4, h5, h6 { font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-            p { margin: 8pt 0; }
-            pre, code {
-              font-family: 'Courier New', monospace;
-              background-color: #f5f5f5;
-              border-radius: 3pt;
-              padding: 2pt 4pt;
-              font-size: 10pt;
-            }
-            pre {
-              padding: 8pt;
-              margin: 8pt 0;
-              overflow-x: auto;
-              white-space: pre-wrap;
-            }
-            code {
-              white-space: pre-wrap;
-            }
-            img {
-              max-width: 100%;
-              height: auto;
-            }
-            a {
-              color: #0066cc;
-              text-decoration: underline;
-            }
-            ul, ol {
-              padding-left: 20pt;
-              margin: 8pt 0;
-            }
-            blockquote {
-              margin: 8pt 0;
-              padding-left: 12pt;
-              border-left: 4pt solid #ddd;
-              color: #666;
-            }
-            table {
-              border-collapse: collapse;
-              width: 100%;
-              margin: 12pt 0;
-            }
-            th, td {
-              border: 1pt solid #ddd;
-              padding: 6pt;
-              text-align: left;
-            }
-            th {
-              background-color: #f5f5f5;
-              font-weight: bold;
-            }
-            /* Syntax highlighting basic styles */
-            .hljs-keyword, .hljs-selector-tag { color: #569cd6; }
-            .hljs-literal, .hljs-number { color: #b5cea8; }
-            .hljs-string { color: #ce9178; }
-            .hljs-comment { color: #6a9955; }
-            .hljs-attribute, .hljs-attr { color: #9cdcfe; }
-            .hljs-function, .hljs-name { color: #dcdcaa; }
-            .hljs-title.class_ { color: #4ec9b0; }
-            .markdown-content pre { background-color: #f8f8f8; }
-          </style>
-        </head>
-        <body>
-          <div class="markdown-content">
-            ${markdownContent}
-          </div>
-          <script>
-            // Remove any complex CSS variables or functions that might cause issues
-            document.querySelectorAll('[style]').forEach(el => {
-              const style = el.getAttribute('style');
-              if (style && (style.includes('oklch') || style.includes('var(--') || style.includes('hsl('))) {
-                // Replace complex color values with simple ones or remove them
-                el.setAttribute('style', style
-                  .replace(/color:.*?(;|$)/g, 'color: #333;')
-                  .replace(/background-color:.*?(;|$)/g, 'background-color: transparent;')
-                );
-              }
-            });
-            
-            // Print automatically when loaded
-            window.onload = () => {
-              setTimeout(() => {
-                window.print();
-                setTimeout(() => window.close(), 500);
-              }, 300);
-            };
-          </script>
-        </body>
-        </html>
-      `;
+        // Create a clean container element for PDF generation
+        const element = document.createElement('div');
+        element.style.fontFamily = 'system-ui, -apple-system, sans-serif';
+        element.style.fontSize = '14px';
+        element.style.lineHeight = '1.6';
+        element.style.color = '#333';
+        element.style.backgroundColor = '#fff';
+        element.style.padding = '40px';
+        element.style.maxWidth = '210mm'; // A4 width
+        element.innerHTML = markdownContent;
 
-        // Write the HTML content to the new window
-        printWindow.document.open();
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
+        // Clean up any dark mode styles that might interfere with PDF
+        element.querySelectorAll('*').forEach(el => {
+          const htmlEl = el as HTMLElement;
+          if (htmlEl.style) {
+            // Remove dark mode colors
+            htmlEl.style.removeProperty('--tw-text-opacity');
+            htmlEl.style.removeProperty('--tw-bg-opacity');
+            if (htmlEl.style.color && (htmlEl.style.color.includes('rgb(') || htmlEl.style.color.includes('var('))) {
+              htmlEl.style.color = '#333';
+            }
+            if (htmlEl.style.backgroundColor && (htmlEl.style.backgroundColor.includes('rgb(') || htmlEl.style.backgroundColor.includes('var('))) {
+              htmlEl.style.backgroundColor = 'transparent';
+            }
+          }
+          // Remove dark mode classes
+          htmlEl.classList.remove('dark:text-white', 'dark:text-gray-100', 'dark:bg-gray-800', 'dark:bg-gray-900');
+        });
 
-        toast.success('PDF export initiated. Check your print dialog.');
+        // Configure html2pdf options
+        const options = {
+          margin: 20,
+          filename: `${pdfName}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { 
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            scrollX: 0,
+            scrollY: 0
+          },
+          jsPDF: { 
+            unit: 'mm', 
+            format: 'a4', 
+            orientation: orientation,
+            putOnlyUsedFonts: true
+          }
+        };
+
+        // Generate and download PDF
+        await html2pdf().set(options).from(element).save();
+        
+        toast.success(`PDF "${pdfName}.pdf" downloaded successfully!`);
       } catch (error) {
         console.error('PDF export failed:', error);
         toast.error(

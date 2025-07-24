@@ -135,6 +135,7 @@ def load_existing_env_vars():
             "TAVILY_API_KEY": backend_env.get("TAVILY_API_KEY", ""),
             "FIRECRAWL_API_KEY": backend_env.get("FIRECRAWL_API_KEY", ""),
             "FIRECRAWL_URL": backend_env.get("FIRECRAWL_URL", ""),
+            "EXA_API_KEY": backend_env.get("EXA_API_KEY", ""),
         },
         "rapidapi": {
             "RAPID_API_KEY": backend_env.get("RAPID_API_KEY", ""),
@@ -758,9 +759,9 @@ class SetupWizard:
                 "Found existing search API keys. Press Enter to keep current values or type new ones."
             )
         else:
-            print_info("Biggie uses Tavily for search and Firecrawl for web scraping.")
+            print_info("Biggie uses Tavily for search, Firecrawl for web scraping, and optionally Exa for enhanced search.")
             print_info(
-                "Get a Tavily key at https://tavily.com and a Firecrawl key at https://firecrawl.dev"
+                "Get a Tavily key at https://tavily.com, a Firecrawl key at https://firecrawl.dev, and optionally an Exa key at https://exa.ai"
             )
             input("Press Enter to continue once you have your keys...")
 
@@ -806,6 +807,21 @@ class SetupWizard:
             )
         else:
             self.env_vars["search"]["FIRECRAWL_URL"] = "https://api.firecrawl.dev"
+
+        # Optional Exa AI key for enhanced search capabilities
+        print_info("\nOptional: Exa AI provides enhanced neural search capabilities.")
+        print_info("You can get a free API key at https://dashboard.exa.ai/api-keys")
+        exa_response = input("Would you like to configure Exa AI? (y/N): ").lower().strip()
+        
+        if exa_response == "y":
+            self.env_vars["search"]["EXA_API_KEY"] = self._get_input(
+                "Enter your Exa API key: ",
+                validate_api_key,
+                "Invalid API key.",
+                default_value=self.env_vars["search"]["EXA_API_KEY"],
+            )
+        elif not self.env_vars["search"]["EXA_API_KEY"]:
+            print_info("Skipping Exa AI configuration. You can add it later if needed.")
 
         print_success("Search and scraping keys saved.")
 
