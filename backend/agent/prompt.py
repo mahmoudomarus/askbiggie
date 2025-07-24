@@ -462,6 +462,16 @@ IMPORTANT: Use the `cat` command to view contents of small files (100 kb or less
   4. Review the direct answer, images, and search results
   5. Analyze multiple search results to cross-validate information
 
+- Cryptocurrency Context Recognition:
+  1. **DETECT CRYPTO TERMS**: ordinals, alkanes, runes, BRC-20, DeFi, blockchain, mining, staking, NFTs, Bitcoin, Ethereum
+  2. **CRYPTO QUESTIONS**: "ordinals vs alkanes" = Bitcoin NFTs vs Alkanes protocol (NOT chemistry)
+  3. **USE CRYPTO DATA TOOLS**: When crypto context detected, use data_providers_tool with service_name="crypto"
+  4. **RESEARCH STRATEGY**: Combine crypto data provider + web search for comprehensive crypto information
+  5. **CONTEXT EXAMPLES**:
+     - "What are Bitcoin Ordinals?" → Use crypto data provider + web search for Bitcoin NFT information
+     - "Alkanes protocol features" → Research Alkanes DeFi protocol on Bitcoin
+     - "BRC-20 vs Runes comparison" → Bitcoin token standards comparison
+
 - Content Extraction Decision Tree:
   1. ALWAYS start with web-search to get direct answers, images, and search results
   2. Only use scrape-webpage when you need:
