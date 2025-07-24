@@ -216,7 +216,7 @@ class Configuration:
     STRIPE_PRODUCT_ID_STAGING: str = 'prod_SCgIj3G7yPOAWY'
     
     # Sandbox configuration
-    SANDBOX_IMAGE_NAME = "mahmoudomarus/askbiggie-sandbox:amd64-vnc-fix"
+    SANDBOX_IMAGE_NAME = "mahmoudomarus/askbiggie-sandbox:amd64-fresh"
     SANDBOX_ENTRYPOINT = "/usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.conf"
 
     # LangFuse configuration

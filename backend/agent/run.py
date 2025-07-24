@@ -247,10 +247,16 @@ async def run_agent(
     if agent_config and agent_config.get('system_prompt'):
         custom_system_prompt = agent_config['system_prompt'].strip()
         
-        # Completely replace the default system prompt with the custom one
-        # This prevents confusion and tool hallucination
-        system_content = custom_system_prompt
-        logger.info(f"Using ONLY custom agent system prompt for: {agent_config.get('name', 'Unknown')}")
+        # Check if this is the default agent - if so, use prompt.py instead
+        if agent_config.get('is_default', False):
+            # Default agents should use prompt.py, not database prompts
+            system_content = default_system_content
+            logger.info(f"Using prompt.py for default agent: {agent_config.get('name', 'Unknown')}")
+        else:
+            # Completely replace the default system prompt with the custom one
+            # This prevents confusion and tool hallucination
+            system_content = custom_system_prompt
+            logger.info(f"Using ONLY custom agent system prompt for: {agent_config.get('name', 'Unknown')}")
     elif is_agent_builder:
         system_content = get_agent_builder_prompt()
         logger.info("Using agent builder system prompt")
