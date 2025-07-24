@@ -83,103 +83,6 @@ class ProcessorConfig:
         if self.max_xml_tool_calls < 0:
             raise ValueError("max_xml_tool_calls must be a non-negative integer (0 = no limit)")
 
-# HTML Content Detection and Filtering
-def contains_substantial_html(text: str) -> bool:
-    """
-    Detect if text contains substantial HTML content that should be filtered.
-    ONLY filters raw HTML dumps - allows legitimate visual rendering workflow.
-    
-    Args:
-        text: The text to check for HTML content
-        
-    Returns:
-        True if text contains raw HTML that should be blocked
-    """
-    if not text or not isinstance(text, str):
-        return False
-    
-    # Check if agent is following proper visual rendering workflow
-    workflow_indicators = [
-        "create_file", "created an html", "html file", "browser_navigate_to", 
-        "browser_take_screenshot", "attached", "visual", "screenshot", 
-        "navigate", "browser", "file:", "workspace", "table.html", "chart.html"
-    ]
-    
-    has_workflow_mention = any(indicator.lower() in text.lower() for indicator in workflow_indicators)
-    
-    # If agent mentions proper workflow, DON'T filter (let it create visual content)
-    if has_workflow_mention:
-        logger.info("✅ VISUAL WORKFLOW DETECTED - allowing HTML content creation")
-        return False
-    
-    # ONLY filter complete HTML document dumps (very strict criteria)
-    document_patterns = [
-        r'<!DOCTYPE\s+html',  # DOCTYPE declaration
-        r'<html[^>]*>.*?</html>',  # Complete HTML document
-        r'<head[^>]*>.*?</head>',  # HTML head section
-        r'<body[^>]*>.*?</body>',  # HTML body section
-    ]
-    
-    # Check for complete HTML document structure
-    document_matches = 0
-    for pattern in document_patterns:
-        if re.search(pattern, text, re.IGNORECASE | re.DOTALL):
-            document_matches += 1
-    
-    html_tag_count = len(re.findall(r'<[^>]+>', text))
-    text_length = len(text)
-    
-    # Only block if it's clearly a raw HTML document dump
-    is_raw_dump = (
-        document_matches >= 2 and  # Has multiple document structure elements
-        html_tag_count > 30 and    # Many tags (indicating full document) 
-        text_length > 2000 and     # Very substantial content
-        (html_tag_count / text_length) > 0.08  # Very high tag density
-    )
-    
-    if is_raw_dump:
-        logger.warning(f"🚨 RAW HTML DOCUMENT DUMP DETECTED - blocking: {document_matches} doc patterns, {html_tag_count} tags in {text_length} chars")
-    
-    return is_raw_dump
-
-def filter_html_content(content: str) -> str:
-    """
-    Filter substantial HTML content and provide a helpful message instead.
-    
-    Args:
-        content: The content to filter
-        
-    Returns:
-        Filtered content with helpful instructions if HTML was detected
-    """
-    if not content or not isinstance(content, str):
-        return content
-    
-    if contains_substantial_html(content):
-        logger.info("🔒 FILTERING HTML CONTENT - replacing with instructions")
-        
-        # Extract any meaningful text content from the HTML
-        text_content = re.sub(r'<[^>]+>', ' ', content)
-        text_content = re.sub(r'\s+', ' ', text_content).strip()
-        
-        # Create a helpful message instead of raw HTML
-        filtered_message = """I've created visual content for you, but I cannot display raw HTML code directly. 
-
-Instead, I should have:
-1. Created an HTML file using the create_file tool
-2. Navigated to it with the browser tool to render it visually
-3. Taken a screenshot to show you the visual result
-4. Attached the HTML file for you to download
-
-If you're seeing this message, there was an issue with my visual rendering process. Please let me know what kind of visual content you were expecting (table, chart, dashboard, etc.) and I'll recreate it properly using the correct visual rendering workflow."""
-
-        if text_content and len(text_content) > 50:
-            filtered_message += f"\n\nText content extracted: {text_content[:500]}..."
-        
-        return filtered_message
-    
-    return content
-
 class ResponseProcessor:
     """Processes LLM responses, extracting and executing tool calls."""
     
@@ -354,16 +257,13 @@ class ResponseProcessor:
                         current_xml_content += chunk_content
 
                         if not (config.max_xml_tool_calls > 0 and xml_tool_call_count >= config.max_xml_tool_calls):
-                            # APPLY HTML FILTERING to chunk content before yielding
-                            filtered_chunk_content = filter_html_content(chunk_content)
-                            
                             # Yield ONLY content chunk (don't save)
                             now_chunk = datetime.now(timezone.utc).isoformat()
                             yield {
                                 "sequence": __sequence,
                                 "message_id": None, "thread_id": thread_id, "type": "assistant",
                                 "is_llm_message": True,
-                                "content": to_json_string({"role": "assistant", "content": filtered_chunk_content}),
+                                "content": to_json_string({"role": "assistant", "content": chunk_content}),
                                 "metadata": to_json_string({"stream_status": "chunk", "thread_run_id": thread_run_id}),
                                 "created_at": now_chunk, "updated_at": now_chunk
                             }
@@ -614,11 +514,8 @@ class ResponseProcessor:
                                 })
                             except json.JSONDecodeError: continue
 
-                # APPLY HTML FILTERING to final accumulated content before saving
-                filtered_accumulated_content = filter_html_content(accumulated_content)
-                
                 message_data = { # Dict to be saved in 'content'
-                    "role": "assistant", "content": filtered_accumulated_content,
+                    "role": "assistant", "content": accumulated_content,
                     "tool_calls": complete_native_tool_calls or None
                 }
 
@@ -870,7 +767,7 @@ class ResponseProcessor:
                                 "index": 0,
                                 "message": {
                                     "role": "assistant",
-                                    "content": filtered_accumulated_content,  # Use filtered content here too
+                                    "content": accumulated_content,
                                     "tool_calls": complete_native_tool_calls or None
                                 }
                             }
@@ -1008,10 +905,7 @@ class ResponseProcessor:
 
 
             # --- SAVE and YIELD Final Assistant Message ---
-            # APPLY HTML FILTERING to non-streaming content before saving
-            filtered_content = filter_html_content(content)
-            
-            message_data = {"role": "assistant", "content": filtered_content, "tool_calls": native_tool_calls_for_message or None}
+            message_data = {"role": "assistant", "content": content, "tool_calls": native_tool_calls_for_message or None}
             assistant_message_object = await self._add_message_with_agent_info(
                 thread_id=thread_id, type="assistant", content=message_data,
                 is_llm_message=True, metadata={"thread_run_id": thread_run_id}
