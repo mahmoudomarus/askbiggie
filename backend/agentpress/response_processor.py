@@ -87,49 +87,60 @@ class ProcessorConfig:
 def contains_substantial_html(text: str) -> bool:
     """
     Detect if text contains substantial HTML content that should be filtered.
+    ONLY filters raw HTML dumps - allows legitimate visual rendering workflow.
     
     Args:
         text: The text to check for HTML content
         
     Returns:
-        True if text contains substantial HTML that should be blocked
+        True if text contains raw HTML that should be blocked
     """
     if not text or not isinstance(text, str):
         return False
     
-    # Pattern to detect HTML structures that indicate substantial HTML content
-    html_patterns = [
-        r'<(?:html|head|body|div|table|tr|td|th|ul|ol|li|form|input|button|script|style)\b[^>]*>',  # Major HTML elements
-        r'<!DOCTYPE\s+html',  # DOCTYPE declaration
-        r'<[^>]+\s+(?:class|id|style)\s*=',  # Elements with CSS attributes
-        r'<table[^>]*>.*?<\/table>',  # Complete table structures
-        r'<(?:thead|tbody|tfoot)[^>]*>',  # Table sections
-        r'<style[^>]*>.*?<\/style>',  # CSS style blocks
-        r'<script[^>]*>.*?<\/script>',  # JavaScript blocks
+    # Check if agent is following proper visual rendering workflow
+    workflow_indicators = [
+        "create_file", "created an html", "html file", "browser_navigate_to", 
+        "browser_take_screenshot", "attached", "visual", "screenshot", 
+        "navigate", "browser", "file:", "workspace", "table.html", "chart.html"
     ]
     
-    # Count HTML-like patterns
-    html_matches = 0
-    for pattern in html_patterns:
-        if re.search(pattern, text, re.IGNORECASE | re.DOTALL):
-            html_matches += 1
+    has_workflow_mention = any(indicator.lower() in text.lower() for indicator in workflow_indicators)
     
-    # Also check for high density of HTML tags
+    # If agent mentions proper workflow, DON'T filter (let it create visual content)
+    if has_workflow_mention:
+        logger.info("✅ VISUAL WORKFLOW DETECTED - allowing HTML content creation")
+        return False
+    
+    # ONLY filter complete HTML document dumps (very strict criteria)
+    document_patterns = [
+        r'<!DOCTYPE\s+html',  # DOCTYPE declaration
+        r'<html[^>]*>.*?</html>',  # Complete HTML document
+        r'<head[^>]*>.*?</head>',  # HTML head section
+        r'<body[^>]*>.*?</body>',  # HTML body section
+    ]
+    
+    # Check for complete HTML document structure
+    document_matches = 0
+    for pattern in document_patterns:
+        if re.search(pattern, text, re.IGNORECASE | re.DOTALL):
+            document_matches += 1
+    
     html_tag_count = len(re.findall(r'<[^>]+>', text))
     text_length = len(text)
     
-    # Consider it substantial HTML if:
-    # 1. Multiple complex HTML patterns detected, OR
-    # 2. High density of HTML tags (more than 1 tag per 50 characters)
-    is_substantial = (
-        html_matches >= 2 or 
-        (html_tag_count > 5 and text_length > 0 and (html_tag_count / text_length) > 0.02)
+    # Only block if it's clearly a raw HTML document dump
+    is_raw_dump = (
+        document_matches >= 2 and  # Has multiple document structure elements
+        html_tag_count > 30 and    # Many tags (indicating full document) 
+        text_length > 2000 and     # Very substantial content
+        (html_tag_count / text_length) > 0.08  # Very high tag density
     )
     
-    if is_substantial:
-        logger.warning(f"🚨 SUBSTANTIAL HTML DETECTED - blocking raw HTML output: {html_matches} patterns, {html_tag_count} tags in {text_length} chars")
+    if is_raw_dump:
+        logger.warning(f"🚨 RAW HTML DOCUMENT DUMP DETECTED - blocking: {document_matches} doc patterns, {html_tag_count} tags in {text_length} chars")
     
-    return is_substantial
+    return is_raw_dump
 
 def filter_html_content(content: str) -> str:
     """
