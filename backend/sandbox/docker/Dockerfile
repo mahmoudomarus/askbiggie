@@ -45,6 +45,7 @@ RUN apt-get update && apt-get install -y \
     # PDF Processing Tools
     poppler-utils \
     wkhtmltopdf \
+    pandoc \
     # Document Processing Tools
     antiword \
     unrtf \
