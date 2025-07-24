@@ -46,8 +46,10 @@ class SandboxWebSearchTool(SandboxToolsBase):
                 logging.info("Exa AI client initialized successfully")
             except ImportError:
                 logging.warning("Exa AI library not installed, falling back to Tavily only")
+                self.exa_client = None
             except Exception as e:
                 logging.warning(f"Failed to initialize Exa AI client: {e}")
+                self.exa_client = None
         else:
             logging.info("No Exa API key found, using Tavily only")
 
@@ -219,15 +221,28 @@ class SandboxWebSearchTool(SandboxToolsBase):
                     exa_search_params = {
                         "query": query,
                         "num_results": min(num_results // 2, 10),  # Use half the results for Exa
-                        "include_domains": include_domains.split(',') if include_domains else None,
-                        "exclude_domains": exclude_domains.split(',') if exclude_domains else None,
                         "use_autoprompt": True,  # Exa's neural search enhancement
                     }
                     
-                    # Remove None values from params
-                    exa_search_params = {k: v for k, v in exa_search_params.items() if v is not None}
+                    # Add domain filtering only if valid
+                    if include_domains:
+                        domains = [d.strip() for d in include_domains.split(',') if d.strip()]
+                        if domains:
+                            exa_search_params["include_domains"] = domains
                     
-                    exa_response = self.exa_client.search_and_contents(**exa_search_params)
+                    if exclude_domains:
+                        domains = [d.strip() for d in exclude_domains.split(',') if d.strip()]
+                        if domains:
+                            exa_search_params["exclude_domains"] = domains
+                    
+                    # Execute Exa search synchronously (Exa client is sync only)
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    exa_response = await loop.run_in_executor(
+                        None, 
+                        lambda: self.exa_client.search_and_contents(**exa_search_params)
+                    )
+                    
                     exa_results = {
                         "results": [
                             {
