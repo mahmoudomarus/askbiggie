@@ -40,7 +40,7 @@ async def run_agent(
     project_id: str,
     stream: bool,
     thread_manager: Optional[ThreadManager] = None,
-    native_max_auto_continues: int = 25,
+    native_max_auto_continues: int = 8,  # Reduced from 25 to 8 to prevent excessive tool retries
     max_iterations: int = 100,
     model_name: str = "anthropic/claude-sonnet-4-20250514",
     enable_thinking: Optional[bool] = False,
@@ -268,13 +268,14 @@ async def run_agent(
 - NEVER: Output any HTML tags whatsoever
 - NEVER: Say "Here's the HTML code" or similar
 
-### CRITICAL: Error Handling (Browser Tools, Token Limits, etc.)
-**IMPORTANT**: If ANY errors occur (browser tools, token limits, sandbox issues), DO NOT STOP EXECUTION!
-- Browser failures are EXPECTED when sandbox has storage issues
-- Token limit errors mean you're generating too much text - use the fallback immediately
-- Continue with the fallback protocol immediately
-- Do not retry failed tools multiple times
-- Do not output any HTML as a result of any error
+### CRITICAL: Tool Failure Handling & No Retries
+**ABSOLUTELY MANDATORY**: When ANY tool fails, DO NOT retry it multiple times!
+- **NEVER retry the same tool more than once**
+- If browser_navigate_to fails → IMMEDIATELY use fallback protocol
+- If browser_take_screenshot fails → IMMEDIATELY use fallback protocol  
+- If any tool fails → Move to alternative approach immediately
+- **DO NOT attempt the same tool call again** - this wastes time and resources
+- **DO NOT stop execution** - always continue with fallback approach
 
 ### MANDATORY FALLBACK PROTOCOL (when ANY tool fails or token limits hit):
 - STILL create the HTML file (you likely already did)
@@ -283,11 +284,20 @@ async def run_agent(
 - Include a brief text summary of the content for context
 - NEVER output raw HTML code even when any tools fail
 
+### RESPONSE STYLE GUIDELINES:
+**FOR GEMINI MODELS**: Be significantly more concise and direct
+- Use shorter paragraphs (2-3 sentences max)
+- Avoid excessive explanations and redundant details
+- Get straight to the point without verbose introductions
+- Use bullet points instead of long narrative text
+- Focus on actionable information only
+
 ### Example Responses When ANY Error Occurs:
 GOOD: "I've created a comprehensive table of all Bittensor subnets. The HTML file is attached - please open it to see the formatted dark-mode table with all 129 subnets, descriptions, and emission data."
 BAD: "Here's the HTML code: <table>..." (NEVER do this!)
 BAD: "The browser tool failed, so here's the raw data..." (NEVER do this!)
 BAD: "I hit a token limit, here's the HTML: <html>..." (NEVER do this!)
+BAD: "Let me try the browser tool again..." (NEVER retry failed tools!)
 
 """
 
@@ -533,14 +543,14 @@ BAD: "I hit a token limit, here's the HTML: <html>..." (NEVER do this!)
         # Set max_tokens based on model
         max_tokens = None
         if "sonnet" in model_name.lower():
-            # Claude Sonnet 4 - increased from 8192 to handle large HTML generation
-            # This fixes the issue where large HTML tables were being truncated and dumped as raw code
-            max_tokens = 32768  # Increased to handle complex visualizations and large data tables
+            # Claude Sonnet 4 - dramatically increased to match actual capabilities
+            # Context manager shows Sonnet can handle 200k total, so we can output much more
+            max_tokens = 150000  # Increased from 32k to 150k for massive HTML files, complex analysis
         elif "gpt-4" in model_name.lower():
             max_tokens = 4096
         elif "gemini-2.5-pro" in model_name.lower():
-            # Gemini 2.5 Pro has 64k max output tokens
-            max_tokens = 64000
+            # Gemini 2.5 Pro - reduced to make it less verbose while still allowing large outputs
+            max_tokens = 45000  # Reduced from 64k to encourage more concise responses
             
         generation = trace.generation(name="thread_manager.run_thread") if trace else None
         try:
