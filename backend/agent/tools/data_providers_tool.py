@@ -7,7 +7,6 @@ from agent.tools.data_providers.YahooFinanceProvider import YahooFinanceProvider
 from agent.tools.data_providers.AmazonProvider import AmazonProvider
 from agent.tools.data_providers.ZillowProvider import ZillowProvider
 from agent.tools.data_providers.TwitterProvider import TwitterProvider
-from agent.tools.data_providers.CryptoProvider import CryptoProvider
 
 class DataProvidersTool(Tool):
     """Tool for making requests to various data providers."""
@@ -20,8 +19,7 @@ class DataProvidersTool(Tool):
             "yahoo_finance": YahooFinanceProvider(),
             "amazon": AmazonProvider(),
             "zillow": ZillowProvider(),
-            "twitter": TwitterProvider(),
-            "crypto": CryptoProvider()
+            "twitter": TwitterProvider()
         }
 
     @openapi_schema({
@@ -34,7 +32,7 @@ class DataProvidersTool(Tool):
                 "properties": {
                     "service_name": {
                         "type": "string",
-                        "description": "The name of the data provider (e.g., 'linkedin', 'twitter', 'zillow', 'amazon', 'yahoo_finance', 'crypto')"
+                        "description": "The name of the data provider (e.g., 'linkedin', 'twitter', 'zillow', 'amazon', 'yahoo_finance')"
                     }
                 },
                 "required": ["service_name"]

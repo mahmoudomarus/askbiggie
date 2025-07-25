@@ -35,26 +35,41 @@ export const MODELS = {
     tier: 'free',
     priority: 100, 
     recommended: true,
-    lowQuality: false
-  },
-
-  'gemini-flash-2.5': { 
-    tier: 'free', 
-    priority: 70,
-    recommended: false,
-    lowQuality: false
-  },
-  'qwen3': { 
-    tier: 'free', 
-    priority: 60,
-    recommended: false,
-    lowQuality: false
+    lowQuality: false,
+    provider: 'OpenRouter (Primary) → Groq → Anthropic',
+    description: 'Latest Claude model with 200k token output, OpenRouter primary for better reliability'
   },
   'kimi-k2': { 
     tier: 'free', 
-    priority: 65,
+    priority: 85,
+    recommended: true,
+    lowQuality: false,
+    provider: 'OpenRouter',
+    description: 'Advanced Chinese language model, excellent for multilingual tasks'
+  },
+  'deepseek-v3': {
+    tier: 'free',
+    priority: 80,
+    recommended: true,
+    lowQuality: false,
+    provider: 'OpenRouter',
+    description: 'State-of-the-art reasoning model, excellent for coding and analysis'
+  },
+  'qwen3-32b': { 
+    tier: 'free', 
+    priority: 75,
+    recommended: true,
+    lowQuality: false,
+    provider: 'OpenRouter',
+    description: 'High-performance open model, good balance of speed and quality'
+  },
+  'claude-3.5-sonnet': {
+    tier: 'free',
+    priority: 70, 
     recommended: false,
-    lowQuality: false
+    lowQuality: false,
+    provider: 'OpenRouter → Anthropic',
+    description: 'Previous generation Claude, reliable fallback option'
   },
 
   // Premium/Paid tier models (require subscription)

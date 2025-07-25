@@ -109,7 +109,6 @@ async def verify_sandbox_access(client, sandbox_id: str, user_id: Optional[str] 
 async def get_sandbox_by_id_safely(client, sandbox_id: str) -> AsyncSandbox:
     """
     Safely retrieve a sandbox object by its ID, using the project that owns it.
-    Automatically starts the sandbox if it's stopped or archived.
     
     Args:
         client: The Supabase client
@@ -132,12 +131,11 @@ async def get_sandbox_by_id_safely(client, sandbox_id: str) -> AsyncSandbox:
     # logger.debug(f"Found project {project_id} for sandbox {sandbox_id}")
     
     try:
-        # Get or start the sandbox (this function already handles starting if needed)
+        # Get the sandbox
         sandbox = await get_or_start_sandbox(sandbox_id)
         # Extract just the sandbox object from the tuple (sandbox, sandbox_id, sandbox_pass)
         # sandbox = sandbox_tuple[0]
-        
-        logger.info(f"Successfully retrieved/started sandbox {sandbox_id}")
+            
         return sandbox
     except Exception as e:
         logger.error(f"Error retrieving sandbox {sandbox_id}: {str(e)}")
@@ -251,25 +249,11 @@ async def read_file(
         try:
             content = await sandbox.fs.download_file(path)
         except Exception as download_err:
-            error_msg = str(download_err)
-            logger.error(f"Error downloading file {path} from sandbox {sandbox_id}: {error_msg}")
-            
-            # Check if this is a sandbox state issue
-            if "not running" in error_msg.lower() or "stopped" in error_msg.lower() or "archived" in error_msg.lower():
-                raise HTTPException(
-                    status_code=503, 
-                    detail=f"Sandbox is not running. The sandbox may have been stopped due to inactivity or storage limits. Please restart your conversation to create a new sandbox."
-                )
-            elif "not found" in error_msg.lower() or "does not exist" in error_msg.lower():
-                raise HTTPException(
-                    status_code=404, 
-                    detail=f"File not found: {path}"
-                )
-            else:
-                raise HTTPException(
-                    status_code=500, 
-                    detail=f"Failed to download file: {error_msg}"
-                )
+            logger.error(f"Error downloading file {path} from sandbox {sandbox_id}: {str(download_err)}")
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Failed to download file: {str(download_err)}"
+            )
         
         # Return a Response object with the content directly
         filename = os.path.basename(path)
@@ -404,69 +388,4 @@ async def ensure_project_sandbox_active(
         }
     except Exception as e:
         logger.error(f"Error ensuring sandbox is active for project {project_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.get("/sandboxes/{sandbox_id}/health")
-async def check_sandbox_health(
-    sandbox_id: str,
-    request: Request = None,
-    user_id: Optional[str] = Depends(get_optional_user_id)
-):
-    """
-    Check the health and status of a sandbox.
-    Returns information about sandbox state, storage usage, and availability.
-    """
-    logger.info(f"Checking health for sandbox {sandbox_id}, user_id: {user_id}")
-    client = await db.client
-    
-    # Verify the user has access to this sandbox
-    await verify_sandbox_access(client, sandbox_id, user_id)
-    
-    try:
-        # Import necessary modules
-        from daytona_sdk import SandboxState
-        from sandbox.sandbox import daytona
-        
-        # Try to get sandbox status
-        sandbox_status = {
-            "sandbox_id": sandbox_id,
-            "status": "unknown",
-            "is_running": False,
-            "message": ""
-        }
-        
-        try:
-            # Get sandbox directly from Daytona
-            sandbox = await daytona.get(sandbox_id)
-            
-            # Check sandbox state
-            if hasattr(sandbox, 'state'):
-                state = sandbox.state
-                sandbox_status["status"] = str(state)
-                sandbox_status["is_running"] = state not in [SandboxState.ARCHIVED, SandboxState.STOPPED]
-                
-                if state == SandboxState.RUNNING:
-                    sandbox_status["message"] = "Sandbox is running and accessible"
-                elif state == SandboxState.ARCHIVED:
-                    sandbox_status["message"] = "Sandbox is archived. It needs to be restarted to access files."
-                elif state == SandboxState.STOPPED:
-                    sandbox_status["message"] = "Sandbox is stopped. It needs to be restarted to access files."
-                else:
-                    sandbox_status["message"] = f"Sandbox is in {state} state"
-            
-            # Try to get storage info if available
-            if hasattr(sandbox, 'storage_used'):
-                sandbox_status["storage_used_mb"] = getattr(sandbox, 'storage_used', 0) / (1024 * 1024)
-            if hasattr(sandbox, 'storage_limit'):
-                sandbox_status["storage_limit_mb"] = getattr(sandbox, 'storage_limit', 0) / (1024 * 1024)
-                
-        except Exception as status_error:
-            logger.error(f"Error getting sandbox status: {str(status_error)}")
-            sandbox_status["error"] = str(status_error)
-            sandbox_status["message"] = "Could not retrieve sandbox status"
-        
-        return sandbox_status
-        
-    except Exception as e:
-        logger.error(f"Error checking sandbox health: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

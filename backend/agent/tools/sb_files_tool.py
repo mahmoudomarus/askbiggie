@@ -126,65 +126,33 @@ class SandboxFilesTool(SandboxToolsBase):
             try:
                 await self._ensure_sandbox()
             except Exception as sandbox_error:
-                error_msg = str(sandbox_error)
-                logger.error(f"Sandbox initialization failed for create_file: {error_msg}")
-                
-                # Check if this is a storage limit issue
-                if "storage" in error_msg.lower() or "limit" in error_msg.lower():
-                    return self.fail_response(f"❌ STORAGE LIMIT REACHED: Cannot create files because sandbox storage is full. Please delete old sandboxes from your Daytona dashboard to free up space. Error: {error_msg}")
-                elif "stopped" in error_msg.lower() or "archived" in error_msg.lower():
-                    return self.fail_response(f"❌ SANDBOX NOT RUNNING: Sandbox was stopped (likely due to storage limits). Please restart the conversation to create a new sandbox. Error: {error_msg}")
-                else:
-                    return self.fail_response(f"❌ SANDBOX CONNECTION FAILED: {error_msg}. Cannot create files without sandbox access. Please restart the conversation or report this technical issue.")
+                return self.fail_response(f"Sandbox connection failed: {str(sandbox_error)}. Cannot create files without sandbox access. Please restart the conversation or report this technical issue.")
             
             file_path = self.clean_path(file_path)
             full_path = f"{self.workspace_path}/{file_path}"
             
             # Check if file already exists
-            try:
-                if await self._file_exists(full_path):
-                    return self.fail_response(f"❌ FILE EXISTS: File '{file_path}' already exists. Use str_replace or full_file_rewrite to modify existing files.")
-            except Exception as file_check_error:
-                logger.warning(f"Could not check if file exists (sandbox may be stopped): {str(file_check_error)}")
-                return self.fail_response(f"❌ SANDBOX ACCESS ERROR: Cannot check file existence. Sandbox may be stopped due to storage limits. Error: {str(file_check_error)}")
+            if await self._file_exists(full_path):
+                return self.fail_response(f"File '{file_path}' already exists. Use str_replace or full_file_rewrite to modify existing files.")
             
             # Create parent directories if needed
             parent_dir = '/'.join(full_path.split('/')[:-1])
-            if parent_dir and parent_dir != self.workspace_path:
+            if parent_dir:
                 try:
                     await self.sandbox.fs.create_folder(parent_dir, "755")
-                    logger.debug(f"Created parent directory: {parent_dir}")
                 except Exception as dir_error:
-                    logger.error(f"Failed to create directory {parent_dir}: {str(dir_error)}")
-                    return self.fail_response(f"❌ DIRECTORY CREATION FAILED: Failed to create directory structure for '{file_path}': {str(dir_error)}. This may indicate sandbox storage issues.")
+                    return self.fail_response(f"Failed to create directory structure for '{file_path}': {str(dir_error)}")
             
             # convert to json string if file_contents is a dict
             if isinstance(file_contents, dict):
                 file_contents = json.dumps(file_contents, indent=4)
             
-            # Write the file content with detailed error handling
+            # Write the file content with error handling
             try:
-                # Log file creation attempt
-                logger.info(f"Creating file: {file_path} (size: {len(file_contents)} chars)")
-                
                 await self.sandbox.fs.upload_file(file_contents.encode(), full_path)
                 await self.sandbox.fs.set_file_permissions(full_path, permissions)
-                
-                logger.info(f"Successfully created file: {file_path}")
-                
             except Exception as file_error:
-                error_msg = str(file_error)
-                logger.error(f"File creation failed for {file_path}: {error_msg}")
-                
-                # Provide specific error messages based on the error type
-                if "storage" in error_msg.lower() or "quota" in error_msg.lower() or "space" in error_msg.lower():
-                    return self.fail_response(f"❌ STORAGE FULL: Cannot create file '{file_path}' - sandbox storage is full ({len(file_contents)} chars attempted). Please delete old sandboxes from your Daytona dashboard to free up space. Error: {error_msg}")
-                elif "permission" in error_msg.lower() or "denied" in error_msg.lower():
-                    return self.fail_response(f"❌ PERMISSION ERROR: Cannot create file '{file_path}' due to permission issues: {error_msg}")
-                elif "not running" in error_msg.lower() or "stopped" in error_msg.lower() or "archived" in error_msg.lower():
-                    return self.fail_response(f"❌ SANDBOX STOPPED: Cannot create file '{file_path}' because sandbox is not running (likely stopped due to storage limits). Please restart the conversation. Error: {error_msg}")
-                else:
-                    return self.fail_response(f"❌ FILE CREATION FAILED: Failed to create file '{file_path}': {error_msg}. This may indicate a sandbox file system issue or storage problem.")
+                return self.fail_response(f"Failed to create file '{file_path}': {str(file_error)}. This may indicate a sandbox file system issue.")
             
             message = f"✅ File '{file_path}' created successfully."
             
@@ -202,17 +170,10 @@ class SandboxFilesTool(SandboxToolsBase):
             return self.success_response(message)
             
         except Exception as e:
-            # Enhanced error reporting for debugging with specific error categorization
-            error_msg = str(e)
-            logger.error(f"Unexpected error in create_file for '{file_path}': {error_msg}")
-            
-            # Categorize the error for better user feedback
-            if "storage" in error_msg.lower() or "quota" in error_msg.lower():
-                return self.fail_response(f"❌ STORAGE ISSUE: Cannot create file due to storage constraints: {error_msg}. Please free up sandbox storage.")
-            elif "connection" in error_msg.lower() or "timeout" in error_msg.lower():
-                return self.fail_response(f"❌ CONNECTION ISSUE: Sandbox connection problem: {error_msg}. Please try again or restart the conversation.")
-            else:
-                return self.fail_response(f"❌ UNEXPECTED ERROR: Error creating file '{file_path}': {error_msg}. This indicates a technical issue with the sandbox file system.")
+            # Enhanced error reporting for debugging
+            error_details = f"Error creating file '{file_path}': {str(e)}"
+            logger.error(error_details)
+            return self.fail_response(f"{error_details}. This indicates a technical issue with the sandbox file system.")
 
     @openapi_schema({
         "type": "function",

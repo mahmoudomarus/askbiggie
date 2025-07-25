@@ -199,7 +199,6 @@ class Configuration:
     
     # Search and other API keys
     TAVILY_API_KEY: str
-    EXA_API_KEY: Optional[str] = None
     RAPID_API_KEY: str
     CLOUDFLARE_API_TOKEN: Optional[str] = None
     FIRECRAWL_API_KEY: str
@@ -216,7 +215,7 @@ class Configuration:
     STRIPE_PRODUCT_ID_STAGING: str = 'prod_SCgIj3G7yPOAWY'
     
     # Sandbox configuration
-    SANDBOX_IMAGE_NAME = "mahmoudomarus/askbiggie-sandbox:amd64-fresh"
+    SANDBOX_IMAGE_NAME = "mahmoudomarus/askbiggie-sandbox:amd64"
     SANDBOX_ENTRYPOINT = "/usr/bin/supervisord -n -c /etc/supervisor/conf.d/supervisord.conf"
 
     # LangFuse configuration

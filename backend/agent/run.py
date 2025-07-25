@@ -25,8 +25,6 @@ from utils.auth_utils import get_account_id_from_thread
 from services.billing import check_billing_status
 from agent.tools.sb_vision_tool import SandboxVisionTool
 from agent.tools.sb_image_edit_tool import SandboxImageEditTool
-from agent.tools.sb_pdf_tool import SandboxPDFTool
-
 from services.langfuse import langfuse
 from langfuse.client import StatefulTraceClient
 from services.langfuse import langfuse
@@ -41,7 +39,7 @@ async def run_agent(
     project_id: str,
     stream: bool,
     thread_manager: Optional[ThreadManager] = None,
-    native_max_auto_continues: int = 8,  # Reduced from 25 to 8 to prevent excessive tool retries
+    native_max_auto_continues: int = 25,
     max_iterations: int = 100,
     model_name: str = "anthropic/claude-sonnet-4-20250514",
     enable_thinking: Optional[bool] = False,
@@ -114,7 +112,6 @@ async def run_agent(
         thread_manager.add_tool(SandboxWebSearchTool, project_id=project_id, thread_manager=thread_manager)
         thread_manager.add_tool(SandboxVisionTool, project_id=project_id, thread_id=thread_id, thread_manager=thread_manager)
         thread_manager.add_tool(SandboxImageEditTool, project_id=project_id, thread_id=thread_id, thread_manager=thread_manager)
-        thread_manager.add_tool(SandboxPDFTool, project_id=project_id, thread_manager=thread_manager)
         if config.RAPID_API_KEY:
             thread_manager.add_tool(DataProvidersTool)
     else:
@@ -135,10 +132,6 @@ async def run_agent(
             thread_manager.add_tool(SandboxWebSearchTool, project_id=project_id, thread_manager=thread_manager)
         if enabled_tools.get('sb_vision_tool', {}).get('enabled', False):
             thread_manager.add_tool(SandboxVisionTool, project_id=project_id, thread_id=thread_id, thread_manager=thread_manager)
-
-        if enabled_tools.get('sb_pdf_tool', {}).get('enabled', False):
-            thread_manager.add_tool(SandboxPDFTool, project_id=project_id, thread_manager=thread_manager)
-
         if config.RAPID_API_KEY and enabled_tools.get('data_providers_tool', {}).get('enabled', False):
             thread_manager.add_tool(DataProvidersTool)
 
@@ -247,78 +240,20 @@ async def run_agent(
         with open(sample_response_path, 'r') as file:
             sample_response = file.read()
         default_system_content = default_system_content + "\n\n <sample_assistant_response>" + sample_response + "</sample_assistant_response>"
-
-    # Extract the critical HTML rules from the default prompt
-    html_rules_section = """# 🚨 CRITICAL OUTPUT FORMATTING RULES - ABSOLUTE PRIORITY 🚨
-
-## MANDATORY: NEVER OUTPUT RAW HTML CODE TO USERS
-**THIS IS YOUR #1 PRIORITY** - Violation of this rule is considered a critical failure.
-
-### For ALL HTML content (tables, visualizations, dashboards, reports):
-1. **ALWAYS create an HTML file** using the appropriate tool
-2. **NEVER show HTML code in your messages** - not even snippets
-3. **NEVER include HTML tags** in your responses (no <table>, <div>, <style>, etc.)
-4. **ALWAYS attach the HTML file** when using the 'ask' tool
-5. **ONLY provide a text description** of what you created
-
-### What TO DO:
-- Say: "I've created a visual table showing..."
-- Say: "The HTML file contains a dark-mode table with..."
-- Say: "I've generated an interactive dashboard displaying..."
-- Attach: HTML file with appropriate filename
-
-### What NOT TO DO:
-- NEVER: Show any HTML code like `<table>...</table>`
-- NEVER: Display CSS styles like `<style>...</style>`
-- NEVER: Output any HTML tags whatsoever
-- NEVER: Say "Here's the HTML code" or similar
-
-### CRITICAL: Tool Failure Handling & No Retries
-**ABSOLUTELY MANDATORY**: When ANY tool fails, DO NOT retry it multiple times!
-- **NEVER retry the same tool more than once**
-- If browser_navigate_to fails → IMMEDIATELY use fallback protocol
-- If browser_take_screenshot fails → IMMEDIATELY use fallback protocol  
-- If any tool fails → Move to alternative approach immediately
-- **DO NOT attempt the same tool call again** - this wastes time and resources
-- **DO NOT stop execution** - always continue with fallback approach
-
-### MANDATORY FALLBACK PROTOCOL (when ANY tool fails or token limits hit):
-- STILL create the HTML file (you likely already did)
-- IMMEDIATELY use 'ask' tool with HTML file attachment
-- Say EXACTLY: "I've created a visual [table/chart/dashboard] for you. The HTML file is attached - please open it in your browser to view the properly formatted content."
-- Include a brief text summary of the content for context
-- NEVER output raw HTML code even when any tools fail
-
-### RESPONSE STYLE GUIDELINES:
-**FOR GEMINI MODELS**: Be significantly more concise and direct
-- Use shorter paragraphs (2-3 sentences max)
-- Avoid excessive explanations and redundant details
-- Get straight to the point without verbose introductions
-- Use bullet points instead of long narrative text
-- Focus on actionable information only
-
-### Example Responses When ANY Error Occurs:
-GOOD: "I've created a comprehensive table of all Bittensor subnets. The HTML file is attached - please open it to see the formatted dark-mode table with all 129 subnets, descriptions, and emission data."
-BAD: "Here's the HTML code: <table>..." (NEVER do this!)
-BAD: "The browser tool failed, so here's the raw data..." (NEVER do this!)
-BAD: "I hit a token limit, here's the HTML: <html>..." (NEVER do this!)
-BAD: "Let me try the browser tool again..." (NEVER retry failed tools!)
-
-"""
-
+    
     # Handle custom agent system prompt
     if agent_config and agent_config.get('system_prompt'):
         custom_system_prompt = agent_config['system_prompt'].strip()
         
-        # CRITICAL FIX: Prepend HTML rules to custom prompt instead of replacing everything
-        system_content = html_rules_section + "\n\n" + custom_system_prompt
-        logger.info(f"Using custom agent system prompt with HTML rules prepended ({len(system_content)} chars total)")
-        logger.info(f"HTML rules prepended to custom agent prompt to prevent raw HTML output")
+        # Completely replace the default system prompt with the custom one
+        # This prevents confusion and tool hallucination
+        system_content = custom_system_prompt
+        logger.info(f"Using ONLY custom agent system prompt for: {agent_config.get('name', 'Unknown')}")
     elif is_agent_builder:
         system_content = get_agent_builder_prompt()
         logger.info("Using agent builder system prompt")
     else:
-        # Use just the default system prompt (which already contains HTML rules)
+        # Use just the default system prompt
         system_content = default_system_content
         logger.info("Using default system prompt only")
     
@@ -545,17 +480,15 @@ BAD: "Let me try the browser tool again..." (NEVER retry failed tools!)
             # logger.debug(f"Constructed temporary message with {len(temp_message_content_list)} content blocks.")
         # ---- End Temporary Message Handling ----
 
-        # Set max_tokens based on model
-        max_tokens = None
-        if "sonnet" in model_name.lower():
-            # Claude Sonnet 4 - set to safe level that leaves room for input tokens
-            # Total context: 200k tokens, so max output should be ~50k to leave room for large inputs
-            max_tokens = 50000  # Reduced from 150k to prevent exceeding total context limit
+        # Set model-specific token limits
+        if "claude" in model_name.lower() and "sonnet" in model_name.lower():
+            # Claude 3.5 Sonnet has a limit of 200k output tokens (increased from 8192 to prevent HTML truncation)
+            max_tokens = 200000
         elif "gpt-4" in model_name.lower():
             max_tokens = 4096
         elif "gemini-2.5-pro" in model_name.lower():
-            # Gemini 2.5 Pro - aggressively reduced to force concise responses and reduce verbosity  
-            max_tokens = 25000  # Further reduced from 45k to 25k to combat extreme verbosity
+            # Gemini 2.5 Pro has 64k max output tokens
+            max_tokens = 64000
             
         generation = trace.generation(name="thread_manager.run_thread") if trace else None
         try:
@@ -606,22 +539,9 @@ BAD: "Let me try the browser tool again..." (NEVER retry failed tools!)
                     async for chunk in response:
                         # If we receive an error chunk, we should stop after this iteration
                         if isinstance(chunk, dict) and chunk.get('type') == 'status' and chunk.get('status') == 'error':
-                            error_message = chunk.get('message', 'Unknown error')
-                            logger.error(f"Error chunk detected: {error_message}")
-                            
-                            # Check if this is a token limit error - treat it as a browser tool failure
-                            # This triggers the HTML fallback protocol instead of dumping raw HTML
-                            if any(keyword in error_message.lower() for keyword in [
-                                'token limit', 'max_tokens', 'length limit', 'too long', 
-                                'token count exceeded', 'maximum context length'
-                            ]):
-                                logger.info("Token limit error detected - this should trigger HTML fallback protocol")
-                                chunk['message'] = f"Browser tool unavailable due to token limits. Please use the HTML fallback protocol: create file, attach with 'ask' tool, and provide text description only."
-                                if trace:
-                                    trace.event(name="token_limit_error_converted_to_browser_fallback", level="INFO", status_message="Token limit error converted to browser tool fallback")
-                            
+                            logger.error(f"Error chunk detected: {chunk.get('message', 'Unknown error')}")
                             if trace:
-                                trace.event(name="error_chunk_detected", level="ERROR", status_message=(f"{error_message}"))
+                                trace.event(name="error_chunk_detected", level="ERROR", status_message=(f"{chunk.get('message', 'Unknown error')}"))
                             error_detected = True
                             yield chunk  # Forward the error chunk
                             continue     # Continue processing other chunks but don't break yet

@@ -71,21 +71,40 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
     if model_name.startswith("openrouter/"):
         return None
     
-    # Map models to their OpenRouter equivalents
+    # Enhanced fallback mapping with OpenRouter as primary for Claude Sonnet-4
     fallback_mapping = {
-        "anthropic/claude-3-7-sonnet-latest": "openrouter/anthropic/claude-3.7-sonnet",
-        "anthropic/claude-sonnet-4-20250514": "openrouter/anthropic/claude-sonnet-4",
-        "xai/grok-4": "openrouter/x-ai/grok-4",
+        # Claude Sonnet-4: OpenRouter -> Groq -> Anthropic fallback chain
+        "claude-sonnet-4": "openrouter/anthropic/claude-3-5-sonnet",
+        "anthropic/claude-sonnet-4-20250514": "openrouter/anthropic/claude-3-5-sonnet",
+        "openrouter/anthropic/claude-3-5-sonnet": "groq/claude-3-5-sonnet",  # If available
+        "groq/claude-3-5-sonnet": "anthropic/claude-sonnet-4-20250514",
+        
+        # Other Claude models
+        "claude-3.5-sonnet": "openrouter/anthropic/claude-3.5-sonnet",
+        "claude-3-sonnet": "openrouter/anthropic/claude-3-sonnet",
+        "claude-3-haiku": "openrouter/anthropic/claude-3-haiku",
+        
+        # Kimi models
         "kimi-k2": "openrouter/moonshotai/kimi-k2",
+        "kimi": "openrouter/moonshotai/kimi-k2",
+        "moonshot-kimi-k2": "openrouter/moonshotai/kimi-k2",
         "moonshotai/kimi-k2": "openrouter/moonshotai/kimi-k2",
-        "qwen3": "openrouter/qwen/qwen3-235b-a22b",
-        "qwen3-32b": "openrouter/qwen/qwen3-32b",
+        
+        # Qwen models with full fallback chain
+        "qwen3": "openrouter/qwen/qwen3-32b",
+        "qwen3-32b": "openrouter/qwen/qwen3-32b", 
         "qwen3-30b": "openrouter/qwen/qwen3-30b-a3b",
         "qwen3-30b-free": "openrouter/qwen/qwen3-30b-a3b:free",
         "qwen/qwen3-32b": "openrouter/qwen/qwen3-32b",
         "qwen/qwen3-30b-a3b": "openrouter/qwen/qwen3-30b-a3b",
         "qwen/qwen3-30b-a3b:free": "openrouter/qwen/qwen3-30b-a3b:free",
-        "qwen/qwen3-235b-a22b": "openrouter/qwen/qwen3-235b-a22b",
+        
+        # Other common models
+        "gpt-4o": "openrouter/openai/gpt-4o",
+        "gpt-4o-mini": "openrouter/openai/gpt-4o-mini", 
+        "gemini-2.5-flash": "openrouter/google/gemini-2.5-flash-preview-05-20",
+        "deepseek-chat": "openrouter/deepseek/deepseek-chat",
+        "deepseek-v3": "openrouter/deepseek/deepseek-v3"
     }
 
     # Model fallback hierarchy for overload situations
@@ -117,6 +136,58 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         return "openrouter/qwen/qwen3-32b"
     
     return None
+
+def create_context_tldr(messages: List[Dict[str, Any]], max_tokens: int = 500) -> str:
+    """Create a TLDR summary of conversation context for provider fallbacks."""
+    if not messages:
+        return ""
+    
+    # Extract key context from recent messages
+    recent_messages = messages[-3:] if len(messages) >= 3 else messages
+    context_parts = []
+    
+    for msg in recent_messages:
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        
+        if role == "user" and content:
+            # Summarize user request
+            if len(content) > 200:
+                context_parts.append(f"User requested: {content[:200]}...")
+            else:
+                context_parts.append(f"User requested: {content}")
+        elif role == "assistant" and content:
+            # Summarize assistant progress
+            if "create_file" in content.lower() or "html" in content.lower():
+                context_parts.append("Assistant was creating HTML/web content")
+            elif "error" in content.lower() or "failed" in content.lower():
+                context_parts.append("Assistant encountered errors")
+    
+    tldr = " | ".join(context_parts)
+    return tldr[:max_tokens] if len(tldr) > max_tokens else tldr
+
+def get_smart_fallback_chain(model_name: str) -> List[str]:
+    """Get intelligent fallback chain based on model type and current context."""
+    
+    # Claude Sonnet-4 specific fallback chain (OpenRouter primary)
+    if "claude-sonnet-4" in model_name.lower() or "anthropic/claude-sonnet-4" in model_name:
+        return [
+            "openrouter/anthropic/claude-3-5-sonnet",  # Primary: OpenRouter
+            "openrouter/qwen/qwen3-32b",               # Fast alternative
+            "openrouter/x-ai/grok-2",                  # High-quality alternative
+            "anthropic/claude-sonnet-4-20250514"      # Direct Anthropic as last resort
+        ]
+    
+    # Other Claude models
+    elif "claude" in model_name.lower():
+        return [
+            f"openrouter/anthropic/{model_name.replace('anthropic/', '').replace('claude-', 'claude-')}",
+            "openrouter/qwen/qwen3-32b",
+            "openrouter/deepseek/deepseek-v3"
+        ]
+    
+    # Default fallback for other models
+    return [fallback_mapping.get(model_name, model_name)]
 
 async def handle_error(error: Exception, attempt: int, max_attempts: int) -> None:
     """Handle API errors with appropriate delays and logging."""
@@ -341,54 +412,65 @@ async def make_llm_api_call(
             logger.debug(f"Successfully received API response from {model_name}")
             return response
             
-        except (litellm.exceptions.InternalServerError, litellm.exceptions.ServiceUnavailableError) as e:
-            error_str = str(e).lower()
-            
-            # Enhanced overload detection across all providers
-            is_overloaded = any(pattern in error_str for pattern in OVERLOAD_PATTERNS)
-            
-            if is_overloaded:
-                logger.warning(f"🚨 Model {model_name} is overloaded/rate-limited, trying production fallbacks...")
+        except litellm.exceptions.InternalServerError as e:
+            # Check if it's an Anthropic overloaded error or general rate limiting
+            if "Overloaded" in str(e) and "AnthropicException" in str(e):
+                logger.warning(f"🚨 Anthropic model {model_name} is overloaded, using smart fallback chain...")
                 
-                # Determine appropriate fallback chain
-                if "anthropic" in model_name.lower():
-                    # Use legacy Anthropic fallbacks for Anthropic-specific models
-                    fallback_models = ANTHROPIC_FALLBACKS
-                else:
-                    # Use full production chain for all other models
-                    fallback_models = PRODUCTION_FALLBACK_CHAIN
+                # Create context TLDR for provider switches
+                context_tldr = create_context_tldr(messages)
+                if context_tldr:
+                    logger.info(f"💭 Context TLDR for fallback: {context_tldr}")
                 
-                # Filter out the current model from fallbacks to avoid loops
-                fallback_models = [m for m in fallback_models if m != model_name]
+                # Use smart fallback chain instead of static list
+                fallback_chain = get_smart_fallback_chain(model_name)
+                logger.info(f"🔗 Fallback chain: {' -> '.join(fallback_chain)}")
                 
-                # Try fallback models in order
-                for fallback_model in fallback_models:
+                for fallback_model in fallback_chain:
                     try:
-                        logger.info(f"🔄 Trying production fallback: {fallback_model}")
+                        logger.info(f"🔄 Trying fallback model: {fallback_model}")
                         fallback_params = params.copy()
                         fallback_params["model"] = fallback_model
                         fallback_params.pop("model_id", None)  # Remove Bedrock-specific param
                         
+                        # Add context preservation if switching providers significantly
+                        if context_tldr and "openrouter" in fallback_model.lower() and "anthropic" not in model_name.lower():
+                            # Add context note for provider switches
+                            enhanced_messages = messages.copy()
+                            if enhanced_messages and enhanced_messages[-1].get("role") == "user":
+                                enhanced_messages[-1]["content"] += f"\n\n[Context: {context_tldr}]"
+                            fallback_params["messages"] = enhanced_messages
+                        
                         response = await litellm.acompletion(**fallback_params)
-                        logger.info(f"✅ Successfully switched to production fallback: {fallback_model}")
+                        logger.info(f"✅ Successfully switched to fallback model: {fallback_model}")
                         return response
                         
                     except Exception as fallback_error:
-                        fallback_error_str = str(fallback_error).lower()
-                        is_fallback_overloaded = any(pattern in fallback_error_str for pattern in OVERLOAD_PATTERNS)
-                        
-                        if is_fallback_overloaded:
-                            logger.warning(f"⚠️ Fallback {fallback_model} also overloaded, trying next...")
-                        else:
-                            logger.warning(f"❌ Fallback {fallback_model} failed with different error: {fallback_error}")
+                        logger.warning(f"❌ Fallback model {fallback_model} also failed: {fallback_error}")
                         continue
                 
                 # If all fallbacks failed, continue with retry logic
-                logger.error(f"🚫 All production fallback models failed for overloaded model {model_name}")
+                logger.error(f"🚫 All smart fallback models failed for overloaded model")
                 last_error = e
                 await handle_error(e, attempt, MAX_RETRIES)
             else:
-                # Other internal server errors
+                # Other internal server errors - also try smart fallbacks
+                logger.warning(f"⚠️ Internal server error with {model_name}, trying fallbacks...")
+                fallback_chain = get_smart_fallback_chain(model_name)
+                
+                if len(fallback_chain) > 1:  # Only try fallbacks if there are alternatives
+                    for fallback_model in fallback_chain[1:]:  # Skip first (likely same model)
+                        try:
+                            logger.info(f"🔄 Trying fallback model: {fallback_model}")
+                            fallback_params = params.copy()
+                            fallback_params["model"] = fallback_model
+                            fallback_params.pop("model_id", None)
+                            response = await litellm.acompletion(**fallback_params)
+                            logger.info(f"✅ Successfully switched to fallback model: {fallback_model}")
+                            return response
+                        except Exception:
+                            continue
+                
                 last_error = e
                 await handle_error(e, attempt, MAX_RETRIES)
 
@@ -405,34 +487,6 @@ async def make_llm_api_call(
         error_msg += f". Last error: {str(last_error)}"
     logger.error(error_msg, exc_info=True)
     raise LLMRetryError(error_msg)
-
-# Enhanced Production Model Fallback Chain
-PRODUCTION_FALLBACK_CHAIN = [
-    # Primary Anthropic Claude models
-    "anthropic/claude-sonnet-4:thinking",
-    "anthropic/claude-3.5-sonnet",
-    
-    # OpenRouter fallbacks with high reliability
-    "openrouter/anthropic/claude-sonnet-4:thinking", 
-    "openrouter/anthropic/claude-3.5-sonnet",
-    "openrouter/x-ai/grok-4",
-    "openrouter/qwen/qwen3-235b-a22b",
-    "openrouter/google/gemini-2.5-pro",
-    "openrouter/openai/gpt-4o",
-]
-
-# Legacy Anthropic fallbacks (keeping for backward compatibility)
-ANTHROPIC_FALLBACKS = [
-    "anthropic/claude-3.5-sonnet",
-    "anthropic/claude-3-haiku-20240307"
-]
-
-# Overload detection patterns
-OVERLOAD_PATTERNS = [
-    "overloaded", "rate limit", "service unavailable", 
-    "temporarily unavailable", "capacity", "quota exceeded",
-    "too many requests", "server overloaded"
-]
 
 # Initialize API keys on module import
 setup_api_keys()
