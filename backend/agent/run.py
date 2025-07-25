@@ -549,8 +549,8 @@ BAD: "Let me try the browser tool again..." (NEVER retry failed tools!)
         elif "gpt-4" in model_name.lower():
             max_tokens = 4096
         elif "gemini-2.5-pro" in model_name.lower():
-            # Gemini 2.5 Pro - reduced to make it less verbose while still allowing large outputs
-            max_tokens = 45000  # Reduced from 64k to encourage more concise responses
+            # Gemini 2.5 Pro - aggressively reduced to force concise responses and reduce verbosity  
+            max_tokens = 25000  # Further reduced from 45k to 25k to combat extreme verbosity
             
         generation = trace.generation(name="thread_manager.run_thread") if trace else None
         try:
