@@ -548,9 +548,9 @@ BAD: "Let me try the browser tool again..." (NEVER retry failed tools!)
         # Set max_tokens based on model
         max_tokens = None
         if "sonnet" in model_name.lower():
-            # Claude Sonnet 4 - dramatically increased to match actual capabilities
-            # Context manager shows Sonnet can handle 200k total, so we can output much more
-            max_tokens = 150000  # Increased from 32k to 150k for massive HTML files, complex analysis
+            # Claude Sonnet 4 - set to safe level that leaves room for input tokens
+            # Total context: 200k tokens, so max output should be ~50k to leave room for large inputs
+            max_tokens = 50000  # Reduced from 150k to prevent exceeding total context limit
         elif "gpt-4" in model_name.lower():
             max_tokens = 4096
         elif "gemini-2.5-pro" in model_name.lower():
