@@ -268,24 +268,26 @@ async def run_agent(
 - NEVER: Output any HTML tags whatsoever
 - NEVER: Say "Here's the HTML code" or similar
 
-### CRITICAL: Browser Tool Error Handling
-**IMPORTANT**: If browser tools fail (502 errors, sandbox issues, etc.), DO NOT STOP EXECUTION!
+### CRITICAL: Error Handling (Browser Tools, Token Limits, etc.)
+**IMPORTANT**: If ANY errors occur (browser tools, token limits, sandbox issues), DO NOT STOP EXECUTION!
 - Browser failures are EXPECTED when sandbox has storage issues
+- Token limit errors mean you're generating too much text - use the fallback immediately
 - Continue with the fallback protocol immediately
-- Do not retry browser tools multiple times
-- Do not output any HTML as a result of the error
+- Do not retry failed tools multiple times
+- Do not output any HTML as a result of any error
 
-### FALLBACK PROTOCOL (mandatory when browser tools fail):
+### MANDATORY FALLBACK PROTOCOL (when ANY tool fails or token limits hit):
 - STILL create the HTML file (you likely already did)
 - IMMEDIATELY use 'ask' tool with HTML file attachment
 - Say EXACTLY: "I've created a visual [table/chart/dashboard] for you. The HTML file is attached - please open it in your browser to view the properly formatted content."
 - Include a brief text summary of the content for context
-- NEVER output raw HTML code even when browser tools fail
+- NEVER output raw HTML code even when any tools fail
 
-### Example Responses When Browser Fails:
+### Example Responses When ANY Error Occurs:
 GOOD: "I've created a comprehensive table of all Bittensor subnets. The HTML file is attached - please open it to see the formatted dark-mode table with all 129 subnets, descriptions, and emission data."
 BAD: "Here's the HTML code: <table>..." (NEVER do this!)
 BAD: "The browser tool failed, so here's the raw data..." (NEVER do this!)
+BAD: "I hit a token limit, here's the HTML: <html>..." (NEVER do this!)
 
 """
 
@@ -531,8 +533,9 @@ BAD: "The browser tool failed, so here's the raw data..." (NEVER do this!)
         # Set max_tokens based on model
         max_tokens = None
         if "sonnet" in model_name.lower():
-            # Claude 3.5 Sonnet has a limit of 8192 tokens
-            max_tokens = 8192
+            # Claude Sonnet 4 - increased from 8192 to handle large HTML generation
+            # This fixes the issue where large HTML tables were being truncated and dumped as raw code
+            max_tokens = 32768  # Increased to handle complex visualizations and large data tables
         elif "gpt-4" in model_name.lower():
             max_tokens = 4096
         elif "gemini-2.5-pro" in model_name.lower():
@@ -588,9 +591,22 @@ BAD: "The browser tool failed, so here's the raw data..." (NEVER do this!)
                     async for chunk in response:
                         # If we receive an error chunk, we should stop after this iteration
                         if isinstance(chunk, dict) and chunk.get('type') == 'status' and chunk.get('status') == 'error':
-                            logger.error(f"Error chunk detected: {chunk.get('message', 'Unknown error')}")
+                            error_message = chunk.get('message', 'Unknown error')
+                            logger.error(f"Error chunk detected: {error_message}")
+                            
+                            # Check if this is a token limit error - treat it as a browser tool failure
+                            # This triggers the HTML fallback protocol instead of dumping raw HTML
+                            if any(keyword in error_message.lower() for keyword in [
+                                'token limit', 'max_tokens', 'length limit', 'too long', 
+                                'token count exceeded', 'maximum context length'
+                            ]):
+                                logger.info("Token limit error detected - this should trigger HTML fallback protocol")
+                                chunk['message'] = f"Browser tool unavailable due to token limits. Please use the HTML fallback protocol: create file, attach with 'ask' tool, and provide text description only."
+                                if trace:
+                                    trace.event(name="token_limit_error_converted_to_browser_fallback", level="INFO", status_message="Token limit error converted to browser tool fallback")
+                            
                             if trace:
-                                trace.event(name="error_chunk_detected", level="ERROR", status_message=(f"{chunk.get('message', 'Unknown error')}"))
+                                trace.event(name="error_chunk_detected", level="ERROR", status_message=(f"{error_message}"))
                             error_detected = True
                             yield chunk  # Forward the error chunk
                             continue     # Continue processing other chunks but don't break yet
