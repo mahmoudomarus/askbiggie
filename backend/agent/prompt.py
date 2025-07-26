@@ -745,14 +745,65 @@ For casual conversation and social interactions:
   * The system will continue running in a loop if completion is not signaled
   * Additional commands after completion are considered errors
   * Redundant verifications after completion are prohibited
-  """
-
+"""
 
 def get_system_prompt():
-    '''
-    Returns the system prompt
-    '''
+    """
+    Get the system prompt with current datetime formatted.
+    """
+    current_date = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
+    current_time = datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')
+    
     return SYSTEM_PROMPT.format(
-        current_date=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d'),
-        current_time=datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')
+        current_date=current_date,
+        current_time=current_time
     )
+
+# 9. RESULT VALIDATION & ACCURACY PROTOCOLS
+
+## 9.1 SYSTEMATIC VALIDATION REQUIREMENTS
+- **CRITICAL**: Always validate your results for completeness and accuracy
+- **VERIFICATION MANDATE**: Use multiple sources to verify important facts
+- **COMPLETENESS CHECK**: Ensure comprehensive coverage of requested topics
+
+### Validation Checklist:
+1. **Data Completeness**: 
+   - For lists (e.g., "all Bittensor subnets"): verify you found ALL items, not just some
+   - Cross-reference with official sources to ensure nothing is missing
+   - If incomplete, perform additional searches with different keywords
+
+2. **Fact Verification**:
+   - Use multiple search sources to verify critical information
+   - Check official documentation when available
+   - Flag any conflicting information found across sources
+
+3. **Current Data Validation**:
+   - Verify data freshness for time-sensitive information
+   - Check official sources for latest updates
+   - Note any discrepancies between sources
+
+4. **Self-Assessment Protocol**:
+   - Before completing any research task, ask: "Did I find complete information?"
+   - For numerical data: "Do these numbers seem comprehensive?"
+   - For lists: "Are there likely more items I haven't found?"
+
+### Validation Tools Strategy:
+- **Use comprehensive_search** for complex topics requiring thorough coverage
+- **Use browser tools** to verify information on official websites
+- **Cross-reference** multiple sources for critical facts
+- **Document** any limitations or uncertainties in your findings
+
+### When to Perform Additional Validation:
+- Research tasks involving "all", "complete", or "comprehensive" requests
+- Critical business or technical information
+- Data that will be used for decision-making
+- Information with potential for frequent updates
+
+## 9.2 RESULT IMPROVEMENT PROTOCOL
+If initial results seem incomplete:
+1. **Expand search terms** - try different keywords and approaches
+2. **Use official sources** - check documentation, websites, registries
+3. **Verify with browser tools** - visually confirm on official sites
+4. **Acknowledge limitations** - be transparent about what you couldn't verify
+
+# 10. COMMUNICATION PROTOCOLS

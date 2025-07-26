@@ -29,11 +29,15 @@ RATE_LIMIT_DELAY = 30
 RETRY_DELAY = 0.1
 
 class LLMError(Exception):
-    """Base exception for LLM-related errors."""
+    """Base exception for LLM service errors."""
     pass
 
 class LLMRetryError(LLMError):
-    """Exception raised when retries are exhausted."""
+    """Exception raised when LLM retries are exhausted."""
+    pass
+
+class LLMContextOverflowError(LLMError):
+    """Exception raised when context overflow is detected."""
     pass
 
 def setup_api_keys() -> None:
@@ -374,6 +378,30 @@ async def make_llm_api_call(
             logger.debug(f"Successfully received API response from {model_name}")
             return response
             
+        except litellm.exceptions.BadRequestError as e:
+            error_str = str(e).lower()
+            # Check for context overflow/token limit errors
+            context_overflow_indicators = [
+                "context window",
+                "token limit",
+                "maximum context length",
+                "too many tokens",
+                "context_length_exceeded",
+                "prompt is too long",
+                "context too large",
+                "input too long",
+                "maximum tokens",
+                "context window exceeded"
+            ]
+            
+            if any(indicator in error_str for indicator in context_overflow_indicators):
+                logger.warning(f"🔍 Context overflow detected for {model_name}: {str(e)}")
+                raise LLMContextOverflowError(f"Context overflow in {model_name}: {str(e)}")
+            else:
+                # Other bad request errors
+                last_error = e
+                await handle_error(e, attempt, MAX_RETRIES)
+
         except litellm.exceptions.InternalServerError as e:
             # Check if it's an Anthropic overloaded error
             if "Overloaded" in str(e) and "AnthropicException" in str(e):

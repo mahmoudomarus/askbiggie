@@ -31,6 +31,9 @@ from services.langfuse import langfuse
 from agent.gemini_prompt import get_gemini_system_prompt
 from agent.tools.mcp_tool_wrapper import MCPToolWrapper
 from agentpress.tool import SchemaType
+from services.llm import LLMError, LLMRetryError, LLMContextOverflowError
+from datetime import datetime, timezone
+import uuid
 
 load_dotenv()
 
@@ -488,8 +491,8 @@ async def run_agent(
         elif "gpt-4" in model_name.lower():
             max_tokens = 4096
         elif "gemini-2.5-pro" in model_name.lower():
-            # Gemini 2.5 Pro has 64k max output tokens
-            max_tokens = 64000
+            # Gemini 2.5 Pro - REDUCED to enforce conciseness and prevent verbosity
+            max_tokens = 8000  # Reduced from 64k to 8k to force concise responses
             
         generation = trace.generation(name="thread_manager.run_thread") if trace else None
         try:
@@ -635,11 +638,60 @@ async def run_agent(
                     continue_execution = False
 
             except Exception as e:
-                # Just log the error and re-raise to stop all iterations
+                # Enhanced error handling with context overflow recovery
                 error_msg = f"Error during response streaming: {str(e)}"
                 logger.error(f"Error: {error_msg}")
+                
+                # Check if this is a context overflow error - attempt graceful recovery
+                if isinstance(e, LLMContextOverflowError) or "context" in str(e).lower():
+                    logger.warning(f"🔍 Context overflow detected - attempting graceful recovery")
+                    
+                    # Add a context summary message to help agent continue
+                    context_recovery_message = {
+                        "role": "user",
+                        "content": "The previous response exceeded the context window. Please continue from where you left off with a shorter, more focused response. If you were generating large content, break it into smaller chunks."
+                    }
+                    
+                    # Store recovery message in thread
+                    await client.table('messages').insert({
+                        "message_id": str(uuid.uuid4()),
+                        "thread_id": thread_id,
+                        "type": "user",
+                        "is_llm_message": False,
+                        "content": json.dumps({"content": context_recovery_message["content"]}),
+                        "metadata": json.dumps({"context_recovery": True, "original_error": str(e)}),
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "updated_at": datetime.now(timezone.utc).isoformat()
+                    }).execute()
+                    
+                    logger.info(f"✅ Added context recovery message - continuing execution")
+                    
+                    yield {
+                        "type": "status",
+                        "status": "context_recovery",
+                        "message": "Context limit reached - continuing with shorter responses"
+                    }
+                    
+                    # Continue execution instead of breaking
+                    continue
+                
+                # For other errors, still try once more before stopping
+                if "timeout" in str(e).lower() or "rate limit" in str(e).lower():
+                    logger.warning(f"⏰ Recoverable error detected - retrying: {str(e)}")
+                    
+                    yield {
+                        "type": "status", 
+                        "status": "retrying",
+                        "message": f"Temporary issue encountered - retrying: {str(e)[:100]}"
+                    }
+                    
+                    # Wait a moment and continue
+                    await asyncio.sleep(2)
+                    continue
+                
+                # For other errors, log and stop
                 if trace:
-                    trace.event(name="error_during_response_streaming", level="ERROR", status_message=(f"Error during response streaming: {str(e)}"))
+                    trace.event(name="error_during_response_streaming", level="ERROR", status_message=error_msg)
                 if generation:
                     generation.end(output=full_response, status_message=error_msg, level="ERROR")
                 yield {
@@ -647,22 +699,41 @@ async def run_agent(
                     "status": "error",
                     "message": error_msg
                 }
-                # Stop execution immediately on any error
+                # Stop execution on unrecoverable errors
                 break
                 
         except Exception as e:
-            # Just log the error and re-raise to stop all iterations
+            # Enhanced outer exception handling with recovery
             error_msg = f"Error running thread: {str(e)}"
             logger.error(f"Error: {error_msg}")
+            
+            # Try context overflow recovery at thread level too
+            if isinstance(e, LLMContextOverflowError) or "context" in str(e).lower():
+                logger.warning(f"🔍 Thread-level context overflow - attempting recovery")
+                
+                yield {
+                    "type": "status",
+                    "status": "context_recovery", 
+                    "message": "Context overflow detected - optimizing for continuation"
+                }
+                
+                # Try to continue with next iteration instead of breaking
+                continue
+            
             if trace:
-                trace.event(name="error_running_thread", level="ERROR", status_message=(f"Error running thread: {str(e)}"))
+                trace.event(name="error_running_thread", level="ERROR", status_message=error_msg)
             yield {
                 "type": "status",
                 "status": "error",
                 "message": error_msg
             }
-            # Stop execution immediately on any error
-            break
+            # Only break for truly unrecoverable errors
+            if "unrecoverable" in str(e).lower() or "fatal" in str(e).lower():
+                break
+            else:
+                # Try to continue for other errors
+                logger.info(f"⚡ Attempting to continue after thread error: {str(e)[:100]}")
+                continue
         if generation:
             generation.end(output=full_response)
 
