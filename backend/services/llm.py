@@ -93,24 +93,6 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         "qwen/qwen3-235b-a22b": "openrouter/qwen/qwen3-235b-a22b",
     }
 
-    # Multi-tier fallback hierarchy for different scenarios
-    CLAUDE_SONNET_4_FALLBACKS = [
-        "openrouter/anthropic/claude-sonnet-4",      # OpenRouter first
-        "groq/claude-sonnet-4",                      # Groq if available  
-        "anthropic/claude-sonnet-4-20250514",       # Direct Anthropic last
-        "openrouter/anthropic/claude-3.5-sonnet",   # 3.5 Sonnet backup
-        "openrouter/qwen/qwen3-32b",                 # High-quality alternative
-        "openrouter/x-ai/grok-2"                    # Final fallback
-    ]
-    
-    # Model fallback hierarchy for overload situations
-    ANTHROPIC_FALLBACKS = [
-        "openrouter/anthropic/claude-3.5-sonnet",
-        "openrouter/qwen/qwen3-32b",
-        "openrouter/x-ai/grok-2",
-        "openrouter/deepseek/deepseek-v3"
-    ]
-
     # Apply fallback mapping first
     if model_name in fallback_mapping:
         logger.info(f"Mapping model {model_name} to {fallback_mapping[model_name]}")
@@ -437,3 +419,21 @@ async def make_llm_api_call(
 
 # Initialize API keys on module import
 setup_api_keys()
+
+# Multi-tier fallback hierarchy for different scenarios - MODULE LEVEL
+CLAUDE_SONNET_4_FALLBACKS = [
+    "openrouter/anthropic/claude-sonnet-4",      # OpenRouter first
+    "groq/claude-sonnet-4",                      # Groq if available  
+    "anthropic/claude-sonnet-4-20250514",       # Direct Anthropic last
+    "openrouter/anthropic/claude-3.5-sonnet",   # 3.5 Sonnet backup
+    "openrouter/qwen/qwen3-32b",                 # High-quality alternative
+    "openrouter/x-ai/grok-2"                    # Final fallback
+]
+
+# Model fallback hierarchy for overload situations - MODULE LEVEL
+ANTHROPIC_FALLBACKS = [
+    "openrouter/anthropic/claude-3.5-sonnet",
+    "openrouter/qwen/qwen3-32b",
+    "openrouter/x-ai/grok-2",
+    "openrouter/deepseek/deepseek-v3"
+]
