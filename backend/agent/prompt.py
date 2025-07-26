@@ -745,19 +745,6 @@ For casual conversation and social interactions:
   * The system will continue running in a loop if completion is not signaled
   * Additional commands after completion are considered errors
   * Redundant verifications after completion are prohibited
-"""
-
-def get_system_prompt():
-    """
-    Get the system prompt with current datetime formatted.
-    """
-    current_date = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
-    current_time = datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')
-    
-    return SYSTEM_PROMPT.format(
-        current_date=current_date,
-        current_time=current_time
-    )
 
 # 9. RESULT VALIDATION & ACCURACY PROTOCOLS
 
@@ -805,5 +792,16 @@ If initial results seem incomplete:
 2. **Use official sources** - check documentation, websites, registries
 3. **Verify with browser tools** - visually confirm on official sites
 4. **Acknowledge limitations** - be transparent about what you couldn't verify
+"""
 
-# 10. COMMUNICATION PROTOCOLS
+def get_system_prompt():
+    """
+    Get the system prompt with current datetime formatted.
+    """
+    current_date = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')
+    current_time = datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')
+    
+    return SYSTEM_PROMPT.format(
+        current_date=current_date,
+        current_time=current_time
+    )
