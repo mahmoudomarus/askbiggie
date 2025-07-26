@@ -71,42 +71,38 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
     if model_name.startswith("openrouter/"):
         return None
     
-    # Enhanced fallback mapping with OpenRouter as primary for Claude Sonnet-4
+    # Model fallback mapping - prioritize specific OpenRouter routes
     fallback_mapping = {
-        # Claude Sonnet-4: OpenRouter -> Groq -> Anthropic fallback chain
-        "claude-sonnet-4": "openrouter/anthropic/claude-3-5-sonnet",
-        "anthropic/claude-sonnet-4-20250514": "openrouter/anthropic/claude-3-5-sonnet",
-        "openrouter/anthropic/claude-3-5-sonnet": "groq/claude-3-5-sonnet",  # If available
-        "groq/claude-3-5-sonnet": "anthropic/claude-sonnet-4-20250514",
-        
-        # Other Claude models
+        # Main model routing - prioritize OpenRouter for better availability
+        "claude-sonnet-4": "openrouter/anthropic/claude-sonnet-4",
+        "anthropic/claude-sonnet-4-20250514": "openrouter/anthropic/claude-sonnet-4", 
+        "anthropic/claude-sonnet-4": "openrouter/anthropic/claude-sonnet-4",
         "claude-3.5-sonnet": "openrouter/anthropic/claude-3.5-sonnet",
-        "claude-3-sonnet": "openrouter/anthropic/claude-3-sonnet",
-        "claude-3-haiku": "openrouter/anthropic/claude-3-haiku",
+        "anthropic/claude-3.5-sonnet": "openrouter/anthropic/claude-3.5-sonnet",
         
-        # Kimi models
+        # Kimi K2 routing
         "kimi-k2": "openrouter/moonshotai/kimi-k2",
-        "kimi": "openrouter/moonshotai/kimi-k2",
-        "moonshot-kimi-k2": "openrouter/moonshotai/kimi-k2",
         "moonshotai/kimi-k2": "openrouter/moonshotai/kimi-k2",
-        
-        # Qwen models with full fallback chain
-        "qwen3": "openrouter/qwen/qwen3-32b",
-        "qwen3-32b": "openrouter/qwen/qwen3-32b", 
+        "qwen3": "openrouter/qwen/qwen3-235b-a22b",
+        "qwen3-32b": "openrouter/qwen/qwen3-32b",
         "qwen3-30b": "openrouter/qwen/qwen3-30b-a3b",
         "qwen3-30b-free": "openrouter/qwen/qwen3-30b-a3b:free",
         "qwen/qwen3-32b": "openrouter/qwen/qwen3-32b",
         "qwen/qwen3-30b-a3b": "openrouter/qwen/qwen3-30b-a3b",
         "qwen/qwen3-30b-a3b:free": "openrouter/qwen/qwen3-30b-a3b:free",
-        
-        # Other common models
-        "gpt-4o": "openrouter/openai/gpt-4o",
-        "gpt-4o-mini": "openrouter/openai/gpt-4o-mini", 
-        "gemini-2.5-flash": "openrouter/google/gemini-2.5-flash-preview-05-20",
-        "deepseek-chat": "openrouter/deepseek/deepseek-chat",
-        "deepseek-v3": "openrouter/deepseek/deepseek-v3"
+        "qwen/qwen3-235b-a22b": "openrouter/qwen/qwen3-235b-a22b",
     }
 
+    # Multi-tier fallback hierarchy for different scenarios
+    CLAUDE_SONNET_4_FALLBACKS = [
+        "openrouter/anthropic/claude-sonnet-4",      # OpenRouter first
+        "groq/claude-sonnet-4",                      # Groq if available  
+        "anthropic/claude-sonnet-4-20250514",       # Direct Anthropic last
+        "openrouter/anthropic/claude-3.5-sonnet",   # 3.5 Sonnet backup
+        "openrouter/qwen/qwen3-32b",                 # High-quality alternative
+        "openrouter/x-ai/grok-2"                    # Final fallback
+    ]
+    
     # Model fallback hierarchy for overload situations
     ANTHROPIC_FALLBACKS = [
         "openrouter/anthropic/claude-3.5-sonnet",
@@ -136,58 +132,6 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         return "openrouter/qwen/qwen3-32b"
     
     return None
-
-def create_context_tldr(messages: List[Dict[str, Any]], max_tokens: int = 500) -> str:
-    """Create a TLDR summary of conversation context for provider fallbacks."""
-    if not messages:
-        return ""
-    
-    # Extract key context from recent messages
-    recent_messages = messages[-3:] if len(messages) >= 3 else messages
-    context_parts = []
-    
-    for msg in recent_messages:
-        role = msg.get("role", "")
-        content = msg.get("content", "")
-        
-        if role == "user" and content:
-            # Summarize user request
-            if len(content) > 200:
-                context_parts.append(f"User requested: {content[:200]}...")
-            else:
-                context_parts.append(f"User requested: {content}")
-        elif role == "assistant" and content:
-            # Summarize assistant progress
-            if "create_file" in content.lower() or "html" in content.lower():
-                context_parts.append("Assistant was creating HTML/web content")
-            elif "error" in content.lower() or "failed" in content.lower():
-                context_parts.append("Assistant encountered errors")
-    
-    tldr = " | ".join(context_parts)
-    return tldr[:max_tokens] if len(tldr) > max_tokens else tldr
-
-def get_smart_fallback_chain(model_name: str) -> List[str]:
-    """Get intelligent fallback chain based on model type and current context."""
-    
-    # Claude Sonnet-4 specific fallback chain (OpenRouter primary)
-    if "claude-sonnet-4" in model_name.lower() or "anthropic/claude-sonnet-4" in model_name:
-        return [
-            "openrouter/anthropic/claude-3-5-sonnet",  # Primary: OpenRouter
-            "openrouter/qwen/qwen3-32b",               # Fast alternative
-            "openrouter/x-ai/grok-2",                  # High-quality alternative
-            "anthropic/claude-sonnet-4-20250514"      # Direct Anthropic as last resort
-        ]
-    
-    # Other Claude models
-    elif "claude" in model_name.lower():
-        return [
-            f"openrouter/anthropic/{model_name.replace('anthropic/', '').replace('claude-', 'claude-')}",
-            "openrouter/qwen/qwen3-32b",
-            "openrouter/deepseek/deepseek-v3"
-        ]
-    
-    # Default fallback for other models
-    return [fallback_mapping.get(model_name, model_name)]
 
 async def handle_error(error: Exception, attempt: int, max_attempts: int) -> None:
     """Handle API errors with appropriate delays and logging."""
@@ -387,6 +331,42 @@ async def make_llm_api_call(
     logger.info(f"Making LLM API call to model: {model_name} (Thinking: {enable_thinking}, Effort: {reasoning_effort})")
     logger.info(f"📡 API Call: Using model {model_name}")
     
+    # Special handling for Claude Sonnet 4 - implement OpenRouter-first fallback chain
+    if "claude-sonnet-4" in model_name.lower() or model_name == "anthropic/claude-sonnet-4-20250514":
+        logger.info(f"🎯 Using Claude Sonnet 4 fallback chain (OpenRouter → Groq → Anthropic)")
+        
+        for i, fallback_model in enumerate(CLAUDE_SONNET_4_FALLBACKS):
+            try:
+                logger.info(f"🔄 Attempting Claude Sonnet 4 fallback {i+1}/{len(CLAUDE_SONNET_4_FALLBACKS)}: {fallback_model}")
+                
+                fallback_params = prepare_params(
+                    messages=messages,
+                    model_name=fallback_model,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    response_format=response_format,
+                    tools=tools,
+                    tool_choice=tool_choice,
+                    api_key=api_key,
+                    api_base=api_base,
+                    stream=stream,
+                    top_p=top_p,
+                    model_id=None,  # Clear model_id for non-Bedrock models
+                    enable_thinking=enable_thinking,
+                    reasoning_effort=reasoning_effort
+                )
+                
+                response = await litellm.acompletion(**fallback_params)
+                logger.info(f"✅ Successfully connected via Claude Sonnet 4 fallback: {fallback_model}")
+                return response
+                
+            except Exception as fallback_error:
+                logger.warning(f"❌ Claude Sonnet 4 fallback {fallback_model} failed: {fallback_error}")
+                if i == len(CLAUDE_SONNET_4_FALLBACKS) - 1:
+                    logger.error(f"🚫 All Claude Sonnet 4 fallbacks exhausted")
+                    raise LLMError(f"All Claude Sonnet 4 fallbacks failed. Last error: {fallback_error}")
+                continue
+    
     params = prepare_params(
         messages=messages,
         model_name=model_name,
@@ -413,34 +393,17 @@ async def make_llm_api_call(
             return response
             
         except litellm.exceptions.InternalServerError as e:
-            # Check if it's an Anthropic overloaded error or general rate limiting
+            # Check if it's an Anthropic overloaded error
             if "Overloaded" in str(e) and "AnthropicException" in str(e):
-                logger.warning(f"🚨 Anthropic model {model_name} is overloaded, using smart fallback chain...")
+                logger.warning(f"🚨 Anthropic model {model_name} is overloaded, trying fallbacks...")
                 
-                # Create context TLDR for provider switches
-                context_tldr = create_context_tldr(messages)
-                if context_tldr:
-                    logger.info(f"💭 Context TLDR for fallback: {context_tldr}")
-                
-                # Use smart fallback chain instead of static list
-                fallback_chain = get_smart_fallback_chain(model_name)
-                logger.info(f"🔗 Fallback chain: {' -> '.join(fallback_chain)}")
-                
-                for fallback_model in fallback_chain:
+                # Try fallback models in order
+                for fallback_model in ANTHROPIC_FALLBACKS:
                     try:
                         logger.info(f"🔄 Trying fallback model: {fallback_model}")
                         fallback_params = params.copy()
                         fallback_params["model"] = fallback_model
                         fallback_params.pop("model_id", None)  # Remove Bedrock-specific param
-                        
-                        # Add context preservation if switching providers significantly
-                        if context_tldr and "openrouter" in fallback_model.lower() and "anthropic" not in model_name.lower():
-                            # Add context note for provider switches
-                            enhanced_messages = messages.copy()
-                            if enhanced_messages and enhanced_messages[-1].get("role") == "user":
-                                enhanced_messages[-1]["content"] += f"\n\n[Context: {context_tldr}]"
-                            fallback_params["messages"] = enhanced_messages
-                        
                         response = await litellm.acompletion(**fallback_params)
                         logger.info(f"✅ Successfully switched to fallback model: {fallback_model}")
                         return response
@@ -450,27 +413,11 @@ async def make_llm_api_call(
                         continue
                 
                 # If all fallbacks failed, continue with retry logic
-                logger.error(f"🚫 All smart fallback models failed for overloaded model")
+                logger.error(f"🚫 All fallback models failed for overloaded Anthropic model")
                 last_error = e
                 await handle_error(e, attempt, MAX_RETRIES)
             else:
-                # Other internal server errors - also try smart fallbacks
-                logger.warning(f"⚠️ Internal server error with {model_name}, trying fallbacks...")
-                fallback_chain = get_smart_fallback_chain(model_name)
-                
-                if len(fallback_chain) > 1:  # Only try fallbacks if there are alternatives
-                    for fallback_model in fallback_chain[1:]:  # Skip first (likely same model)
-                        try:
-                            logger.info(f"🔄 Trying fallback model: {fallback_model}")
-                            fallback_params = params.copy()
-                            fallback_params["model"] = fallback_model
-                            fallback_params.pop("model_id", None)
-                            response = await litellm.acompletion(**fallback_params)
-                            logger.info(f"✅ Successfully switched to fallback model: {fallback_model}")
-                            return response
-                        except Exception:
-                            continue
-                
+                # Other internal server errors
                 last_error = e
                 await handle_error(e, attempt, MAX_RETRIES)
 

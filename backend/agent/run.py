@@ -480,18 +480,11 @@ async def run_agent(
             # logger.debug(f"Constructed temporary message with {len(temp_message_content_list)} content blocks.")
         # ---- End Temporary Message Handling ----
 
-        # Set model-specific token limits with dynamic calculation
-        if "claude" in model_name.lower() and "sonnet" in model_name.lower():
-            # Claude has 200k total context limit - calculate available output tokens
-            total_context_limit = 200000
-            # Estimate input tokens (rough approximation: 1 token ≈ 4 characters)
-            estimated_input_tokens = sum(len(str(msg.get('content', ''))) for msg in messages) // 4
-            # Reserve buffer for conversation growth and safety margin
-            safety_buffer = 10000
-            available_output_tokens = total_context_limit - estimated_input_tokens - safety_buffer
-            # Ensure reasonable bounds: minimum 8k, maximum 150k output tokens
-            max_tokens = max(8192, min(150000, available_output_tokens))
-            logger.info(f"Claude dynamic tokens: estimated_input={estimated_input_tokens}, available_output={available_output_tokens}, final_max={max_tokens}")
+        # Set max_tokens based on model
+        max_tokens = None
+        if "sonnet" in model_name.lower():
+            # Claude Sonnet 4 supports much higher output - increase for HTML/complex content generation
+            max_tokens = 32000  # Increased from 8192 to handle large HTML/table creation
         elif "gpt-4" in model_name.lower():
             max_tokens = 4096
         elif "gemini-2.5-pro" in model_name.lower():
