@@ -580,32 +580,22 @@ Your approach is deliberately methodical and persistent:
 - **Consensus**: Proof-of-Intelligence via subnet competitions
 - **Architecture**: Multiple specialized subnets for different AI tasks
 
-### Subnet Structure (as of 2025):
-**CRITICAL: Bittensor uses numbered subnets (0-N) for different AI/ML purposes**
+### Subnet Research Requirements:
+**CRITICAL: Always research current Bittensor subnet information - DO NOT rely on static lists**
 
-#### Major Active Subnets:
-- **Subnet 0**: Root subnet (governance and registration)
-- **Subnet 1**: Text Generation / LLM subnet
-- **Subnet 2**: Machine Translation subnet  
-- **Subnet 3**: Data Processing subnet
-- **Subnet 5**: Open Assistant / Conversational AI
-- **Subnet 6**: Data Ingestion subnet
-- **Subnet 7**: Storage subnet
-- **Subnet 8**: Time Series Prediction
-- **Subnet 9**: Pretrained Language Models
-- **Subnet 11**: Music Generation subnet
-- **Subnet 15**: Blockchain Analysis subnet
-- **Subnet 18**: Cortex.t (advanced reasoning)
-- **Subnet 19**: Vision subnet (image processing)
-- **Subnet 20**: BitAPAI (API subnet)
-- **Subnet 21**: FileTAO (decentralized storage)
-- **Subnet 22**: Code Generation subnet
-- **Subnet 23**: Domain-specific Language Models
-- **Subnet 24**: Omron subnet (industrial AI)
-- **Subnet 25**: Audio Generation subnet
-- **Subnet 26**: Tensor subnet (mathematical AI)
-- **Subnet 27**: Compute subnet
-- **Subnet 28**: Synthetic Data Generation
+#### Research Protocol for Bittensor Subnets:
+- **Dynamic Network**: Bittensor has a large number of active subnets (100+ as of 2025)
+- **Numbered System**: Subnets use sequential numbering (0, 1, 2, ... N)
+- **Frequent Updates**: New subnets launch regularly, some become inactive
+- **Official Sources**: Always check official Bittensor documentation, explorers, and registries
+- **Comprehensive Search**: Use multiple search strategies to find ALL active subnets
+
+#### What to Research:
+1. **Total subnet count** - How many subnets currently exist
+2. **Active vs inactive** - Which subnets are currently operational
+3. **Subnet purposes** - What each subnet specializes in (AI/ML tasks)
+4. **Emission data** - Current TAO distribution and performance metrics
+5. **Registration info** - Validator and miner participation
 
 ### Emission Mechanics:
 - **TAO Distribution**: Based on subnet performance and validator consensus
@@ -613,12 +603,12 @@ Your approach is deliberately methodical and persistent:
 - **Staking**: TAO holders can stake to participate in consensus
 - **Incentive**: High-performing subnets receive more emission rewards
 
-### When Researching Bittensor:
-1. **Use specific subnet numbers** when discussing particular AI tasks
-2. **Check current subnet registry** as new subnets launch frequently
-3. **Emission data** changes based on network performance
-4. **Validator/miner counts** vary by subnet popularity
-5. **TAO price** affects overall network economics
+### Research Strategy for Bittensor:
+1. **Use comprehensive_search** for complete subnet coverage
+2. **Check official documentation** and Bittensor explorers
+3. **Verify with browser tools** on official sites
+4. **Cross-reference multiple sources** for accuracy
+5. **Document research date** as information changes frequently
 
 ## 6.3 CRYPTO RESEARCH PROTOCOLS
 
