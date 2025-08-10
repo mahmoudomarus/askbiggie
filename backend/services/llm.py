@@ -95,6 +95,11 @@ def get_openrouter_fallback(model_name: str) -> Optional[str]:
         "qwen/qwen3-30b-a3b": "openrouter/qwen/qwen3-30b-a3b",
         "qwen/qwen3-30b-a3b:free": "openrouter/qwen/qwen3-30b-a3b:free",
         "qwen/qwen3-235b-a22b": "openrouter/qwen/qwen3-235b-a22b",
+        
+        # OpenAI GPT-5
+        "gpt-5": "openrouter/openai/gpt-5",
+        "chatgpt-5": "openrouter/openai/gpt-5",
+        "openai/gpt-5": "openrouter/openai/gpt-5",
     }
 
     # Apply fallback mapping first
@@ -453,6 +458,7 @@ CLAUDE_SONNET_4_FALLBACKS = [
     "openrouter/anthropic/claude-sonnet-4",      # OpenRouter first
     "groq/claude-sonnet-4",                      # Groq if available  
     "anthropic/claude-sonnet-4-20250514",       # Direct Anthropic last
+    "openrouter/openai/gpt-5",                  # GPT-5 as premium fallback
     "openrouter/anthropic/claude-3.5-sonnet",   # 3.5 Sonnet backup
     "openrouter/qwen/qwen3-32b",                 # High-quality alternative
     "openrouter/x-ai/grok-2"                    # Final fallback
@@ -460,6 +466,7 @@ CLAUDE_SONNET_4_FALLBACKS = [
 
 # Model fallback hierarchy for overload situations - MODULE LEVEL
 ANTHROPIC_FALLBACKS = [
+    "openrouter/openai/gpt-5",                  # GPT-5 as premium alternative
     "openrouter/anthropic/claude-3.5-sonnet",
     "openrouter/qwen/qwen3-32b",
     "openrouter/x-ai/grok-2",

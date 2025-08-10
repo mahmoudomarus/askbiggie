@@ -136,6 +136,15 @@ MODELS = {
         "tier_availability": ["free", "paid"]
     },
     
+    "openrouter/openai/gpt-5": {
+        "aliases": ["gpt-5", "chatgpt-5", "openai/gpt-5"],
+        "pricing": {
+            "input_cost_per_million_tokens": 10.00,
+            "output_cost_per_million_tokens": 30.00
+        },
+        "tier_availability": ["paid"]
+    },
+    
 }
 
 # Derived structures (auto-generated from MODELS)
@@ -184,6 +193,13 @@ def _generate_model_structures():
                 pricing[alias] = config["pricing"]
         elif model_name.startswith("openrouter/moonshotai/"):
             # Add pricing for moonshot models
+            legacy_name = model_name.replace("openrouter/", "")
+            pricing[legacy_name] = config["pricing"]
+            # Add pricing for aliases
+            for alias in config["aliases"]:
+                pricing[alias] = config["pricing"]
+        elif model_name.startswith("openrouter/openai/"):
+            # Add pricing for OpenAI models via OpenRouter
             legacy_name = model_name.replace("openrouter/", "")
             pricing[legacy_name] = config["pricing"]
             # Add pricing for aliases
